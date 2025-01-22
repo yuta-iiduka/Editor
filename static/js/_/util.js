@@ -1,5 +1,18 @@
 console.log("util.js is called.");
 
+
+class Platform{
+
+    static isMobile(){
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isMobile = /android|iphone|ipad|ipod|windows phone|mobile/i.test(userAgent);
+        return isMobile;
+    }
+
+    static isPC(){
+        return !this.isMobile();
+    }
+}
 class Style{
     constructor(css=""){
         this.head = document.querySelector("head");
@@ -147,11 +160,14 @@ class Grid{
             h:  window.innerHeight / this.height,
         }
     }
+
     constructor(x=64,y=64,selector="body"){
         this.id = Grid.id++;
         this.x = x;
         this.y = y;
+        this.baseFontSize = Platform.isPC() ? Grid.width / 100 : Grid.width / 50;
         this.dom = this.make(selector);
+        this.fontSize = this.baseFontSize;
         this._objects = {};
 
         this.draw();
@@ -173,6 +189,14 @@ class Grid{
 
     get h(){
         return this.y > 0 ? (Grid.height / this.y) * Grid.windowRatio.h : 0;
+    }
+
+    get fontSize(){
+        return parseFloat(this.dom.style.fontSize.split("px").join(""));
+    }
+
+    set fontSize(size){
+        this.dom.style.fontSize = `${size}px`;
     }
 
     make(selector){
@@ -264,6 +288,9 @@ class Grid{
         for(let o of this.objects){
             o.resize(ratio);
         }
+
+        // フォントサイズを変更
+        this.fontSize = Grid.windowRatio.w * this.baseFontSize;
 
         // グリッドの再描画
         this.draw();
@@ -586,7 +613,7 @@ class Sticky{
 
     pickable(dom=document.createElement("div"),editable=true){
         const self = this;
-        dom.setAttribute("contenteditable",true);
+        dom.setAttribute("contenteditable",editable);
         dom.style.height = "100%";
         dom.style.width = "100%";
         const pack = document.createElement("div");
