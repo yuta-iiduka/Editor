@@ -1,0 +1,48 @@
+{% extends "_base.html" %}
+
+{% block title %}テーブル一覧{% endblock %}
+{% block content %}
+    <!-- table -->
+    <div id="t">
+        <table>
+            <thead>
+                <tr>
+                    {% for n, t in model["types"].items() %}
+                        {% if n in model["primary_keys"] %}
+                        <th data-field="{{n}}" data-type="str" style="color:aqua">{{n}}:{{t}}</th>
+                        {% else %}
+                        <th data-field="{{n}}" data-type="str">{{n}}:{{t}}</th>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for d in data %}
+                <tr>
+                    {% for n, t in model["types"].items() %}
+                        {% if n in model["primary_keys"] %}
+                        <td data-{{n}}>{{d[n]}}</td>
+                        {% else %}
+                        <td data-{{n}}>{{d[n]}}</td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot></tfoot>
+        </table>
+    </div>
+
+    <!-- table info -->
+    <div id="tableinfo" hidden>
+        {% for p in model["primary_keys"] %}
+            <div class="primary_keys">{{p}}</div>
+        {% endfor %}
+        <div id="post-url" data-url="{{url_for('debugger.table_post',tablename=model['name'])}}"></div>
+    </div>
+{% endblock %}
+
+
+{% block script %}
+    <script src="{{url_for('static',filename='js/debugger/table_control.js')}}"></script>
+{% endblock %}

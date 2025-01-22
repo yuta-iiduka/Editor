@@ -1,0 +1,8 @@
+{
+    "prompt": "",
+    "negative_prompt": "EasyNegative, deformed mutated disfigured, missing arms, 4 fingers, 6 fingers, extra_arms , mutated hands, bad anatomy, disconnected limbs, low quality, worst quality, out of focus, ugly, error, blurry, bokeh, Shoulder bag, bag, multiple arms, nipples",
+    "styles":[
+        "sd\prefectPonyXL_v3.safetensors [e31a2563f0]"
+    ],
+    "seed":-1
+}
