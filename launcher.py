@@ -18,6 +18,13 @@ def p_start():
             return p
         t1 = threading.Thread(target=start_bat, daemon=True)
         t1.start()
+
+        def start_browser():
+            p = subprocess.Popen(["C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe","http://localhost:5555"])
+            return p
+        t2 = threading.Thread(target=start_browser, daemon=True)
+        t2.start()
+
         messagebox.showinfo("Success","起動に成功しました。")
     except subprocess.CalledProcessError as e:
         messagebox.showerror("Error",f"バッチファイルの実行中にエラーが発生しました。\n{e}")

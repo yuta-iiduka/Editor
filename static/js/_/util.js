@@ -144,6 +144,8 @@ class Grid{
         this.list = [];
         this.id = 0;
         this.event_resize();
+        this.is_pc = Platform.isPC();
+        this.is_mobile = Platform.isMobile();
     }
 
     static event_resize(){
@@ -270,9 +272,28 @@ class Grid{
         }
     }
 
+    check(obj){
+        let message = "";
+        if(obj.x === undefined || obj.y === undefined || obj.z === undefined || obj.h === undefined || obj.w === undefined){
+            message = "座標指定かサイズ指定が未定義です\n";
+        }
+
+        if(obj.draw === undefined || obj.resize === undefined){
+            message = "描画関数、リサイズ関数が未定義です\n";
+        }
+
+        return message;
+    }
+
     append(id,obj){
-        this._objects[id] = obj;
-        this.dom.appendChild(obj.pack);
+        if(this.check(obj) !== ""){
+            obj.x = obj.x * this.w;
+            obj.y = obj.y * this.h;
+            obj.h = obj.h * this.h;
+            obj.w = obj.w * this.w;
+            this._objects[id] = obj;
+            this.dom.appendChild(obj.pack);
+        }
         return this._objects;
     }
 
@@ -298,115 +319,6 @@ class Grid{
 
 }
 
-class GridObject{
-    static{
-        this.cnt = 0;
-    }
-    constructor(x=50,y=50,z=1,w=100,h=100){
-        this.id = `gridobject${GridObject.cnt++}`;
-        // 座標情報
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.w = w;
-        this.h = h;
-        this.ratio = {w:1,h:1};
-
-        this.borderWidth = "3px";
-        this.dom = null;
-        this.pack = null;
-
-        this.visible = true;
-        this.resizable = true;
-
-    }
-
-    make(html=""){
-        const pack = document.createElement("div");
-        pack.style.position = "fixed";
-        pack.style.overflow = "hidden";
-        pack.style.border = "solid";
-        pack.style.borderWidth = "1px";
-        const dom  = document.createElement("div");
-        pack.appendChild(dom);
-        if(typeof(html) === "string"){
-            dom.innerHTML = html;
-        }else{
-            dom.appendChild(html);
-        }
-        this.dom  = dom;
-        this.pack = pack;
-        return dom;
-    }
-
-    wrap(selector){
-        if(typeof(selector) === "string"){
-            // 既存DOMから生成
-            this.dom = document.querySelector(selector);
-        }else{
-            this.dom = selector;
-        }
-        
-        if(this.dom === null){ console.error("セレクタの指定が間違えています。"); }
-        const x = this.dom.dataset.x;
-        const y = this.dom.dataset.y;
-        const z = this.dom.dataset.z;
-        const w = this.dom.dataset.w;
-        const h = this.dom.dataset.h;
-
-        this.x = x === undefined ? this.x : x;
-        this.y = y === undefined ? this.y : y;
-        this.z = z === undefined ? this.z : z;
-        this.w = w === undefined ? this.w : w;
-        this.h = h === undefined ? this.h : h;
-    }
-
-    draw(){
-        console.log("draw");
-        this.pack.style.display = "inline-block";
-        this.pack.style.left   = `${this.left}px`;
-        this.pack.style.top    = `${this.top}px`;
-        this.pack.style.width  = `${this.width}px`;
-        this.pack.style.height = `${this.height}px`;
-        // this.pack.style.borderWidth = `${this.borderWidth}px`;
-
-        if(this.visible === false){
-            this.pack.style.display = "none";
-        }
-        return ;
-    }
-
-    resize(ratio){
-        if(this.resizable === false){return;}
-        this.ratio = ratio;
-        return ;
-    }
-
-    get left(){
-        return this.x * this.ratio.w;
-    }
-
-    get top(){
-        return this.y * this.ratio.h;
-    }
-
-    get right(){
-        return (this.x + this.w) * this.ratio.w;
-    }
-
-    get bottom(){
-        return (this.y + this.h) * this.ratio.h; 
-    }
-
-    get width(){
-        return this.w * this.ratio.w;
-    }
-
-    get height(){
-        return this.h * this.ratio.h;
-    }
-}
-
 class Sticky{
     static{
         this.cnt = 0;
@@ -418,8 +330,8 @@ class Sticky{
             Sticky.mouseX = e.pageX;
             Sticky.mouseY = e.pageY;
         });
-        this.MAX_ZINDEX = 1000;
-        this.MIN_ZINDEX = 1;
+        this.MAX_ZINDEX = 1;
+        this.MIN_ZINDEX = 0;
         
         this.canvas = this.canv();
         this.ctx = this.canvas.getContext("2d");
@@ -493,7 +405,7 @@ class Sticky{
         Dom.style(`${style}`);
     }
 
-    constructor(x=10,y=10,z=10,w=100,h=100){
+    constructor(x=10,y=10,z=1,w=5,h=5){
         this.id = Sticky.cnt++;
         // 座標情報
         this.x = x;
@@ -576,6 +488,11 @@ class Sticky{
             this.dom.appendChild(html);
         }
         this.pickable(this.dom);
+        this.dom.dataset.x = this.x;
+        this.dom.dataset.y = this.y;
+        this.dom.dataset.z = this.z;
+        this.dom.dataset.h = this.h;
+        this.dom.dataset.w = this.w;
     }
 
     wrap(selector, editable=true){
@@ -620,7 +537,8 @@ class Sticky{
         pack.style.position = "fixed";
         pack.style.overflow = "hidden";
         pack.style.border = "solid";
-        pack.style.borderWidth = "3px";
+        pack.style.borderWidth = "2px";
+        pack.style.borderRadius = "4px";
         const frame = document.createElement("div");
         frame.style.overflow = "hidden";
         frame.style.height = "100%";
@@ -938,7 +856,7 @@ class Sticky{
     }
 
     get left(){
-        return this.x * this.ratio.w
+        return this.x * this.ratio.w;
     }
 
     get top(){
