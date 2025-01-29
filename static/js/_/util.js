@@ -278,7 +278,7 @@ class Grid{
             message = "座標指定かサイズ指定が未定義です\n";
         }
 
-        if(obj.draw === undefined || obj.resize === undefined){
+        if(typeof(obj.draw) !== "function" || typeof(obj.resize) !== "function"){
             message = "描画関数、リサイズ関数が未定義です\n";
         }
 
@@ -286,13 +286,16 @@ class Grid{
     }
 
     append(id,obj){
-        if(this.check(obj) !== ""){
+        const msg = this.check(obj).length;
+        if(msg === 0){
             obj.x = obj.x * this.w;
             obj.y = obj.y * this.h;
             obj.h = obj.h * this.h;
             obj.w = obj.w * this.w;
             this._objects[id] = obj;
             this.dom.appendChild(obj.pack);
+        }else{
+            console.warn(msg);
         }
         return this._objects;
     }

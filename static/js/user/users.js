@@ -42,3 +42,72 @@ g.append(o2.id,o2);
 g.append(o3.id,o3);
 g.draw();
 
+
+const xhr = new XMLHttpRequest();
+let responseText = "";
+let responseData = null;
+// xhr.onload = function(){
+//     if(xhr.readyState == 4 && xhr.status == 200){
+//         responseText = xhr.responseText;
+//         responseData = JSON.parse(responseText);
+//         console.log(responseData);
+//     }else{
+//         alert("通信に失敗しました");
+//     }
+// }
+
+const btn1 = document.querySelector("#btn1");
+const btn2 = document.querySelector("#btn2");
+const btn3 = document.querySelector("#btn3");
+const csrf_token = document.querySelector("meta[name=csrf_token]").getAttribute("value");
+
+btn1.addEventListener("click",function(){
+    xhr.open("POST",btn1.dataset.url);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader('X-CSRFToken', csrf_token);
+    xhr.onload = function(){
+        if(xhr.readyState == 4 && xhr.status == 200){
+            responseText = xhr.responseText;
+            responseData = JSON.parse(responseText);
+            console.log(responseData);
+        }else{
+            alert("通信に失敗しました");
+        }
+    }
+    xhr.send(JSON.stringify({}));
+    console.log("btn1");
+});
+btn2.addEventListener("click",function(){
+    xhr.open("POST",btn2.dataset.url);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader('X-CSRFToken', csrf_token);  
+    xhr.onload = function(){
+        if(xhr.readyState == 4 && xhr.status == 200){
+            responseText = xhr.responseText;
+            responseData = JSON.parse(responseText);
+            console.log(responseData);
+        }else{
+            alert("通信に失敗しました");
+        }
+    }
+    xhr.send(JSON.stringify({}));
+    console.log("btn2");
+});
+
+btn3.addEventListener("click", async function(){
+    const response = await fetch(btn3.dataset.url,{
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          'X-CSRFToken': csrf_token,
+        },
+        body: JSON.stringify({}),
+    });
+    if(response.ok){
+        responseData = await response.json();
+        console.log(responseData);
+    }else{
+        alert("通信に失敗しました");
+    }
+    console.log("btn3");
+})

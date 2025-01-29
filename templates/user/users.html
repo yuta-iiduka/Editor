@@ -23,6 +23,9 @@
         </table>
     </div>
     <div id="t"></div>
+    <div id="btn1" data-url="{{url_for('user.v1_num',num=12)}}">XHR1</div>
+    <div id="btn2" data-url="{{url_for('user.v2_num',num=12)}}">XHR2</div>
+    <div id="btn3" data-url="{{url_for('user.v2_num',num=12)}}">fetch</div>
 {% endblock %}
 
 {% block script %}
