@@ -13,32 +13,44 @@ class Canvas{
     static PER = {
         PERCENT:"%", PIXEL:"px", VW:"vw", VH:"vh"
     };
-    static window = { width: window.innerWidth, height: window.innerHeight}
+    static window = { width: window.innerWidth, height: window.innerHeight};
+    static mouse = {x:16, y:16};
 
     static{
-        window.addEventListener("resize",function(){
+        window.addEventListener("resize",function(e){
             const cl = Canvas.list;
             for(let c of cl){
                 c.resize(window.innerWidth / Canvas.window.width, window.innerHeight / Canvas.window.height);
+                for(let o of Object.values(c.objects)){
+                    o.resize(window.innerWidth / Canvas.window.width, window.innerHeight / Canvas.window.height);
+                }
             }
         });
+        document.addEventListener("mouseup",function(){
+            const cl = Canvas.list;
+            for(let c of cl){
+                for(let o of c.list){
+                    o.draw();
+                }
+            }
+        })
     }
 
     constructor(selector){
         this.parent = document.querySelector(selector);
         this.id = Canvas.cnt++;
-
         this.dom = this.build();
         this.ctx = this.dom.getContext("2d");
-
         this.color = Canvas.COLOR.BLACK;
         this.backgroundColor = Canvas.COLOR.ORANGE;
         this.per = Canvas.PER.PERCENT;
         this.height = `${Canvas.SIZE.XLARGE}`;
         this.width = `${Canvas.SIZE.XLARGE}`;
-
         this.img_data = null;
-
+        this.mouseX = Canvas.mouse.x;
+        this.mouseY = Canvas.mouse.y;
+        this.objects = {};
+        this.list = [];
         this.adjust();
 
         Canvas.list.push(this);
@@ -99,6 +111,7 @@ class Canvas{
         dom.classList.add("canvas");
         this.parent.appendChild(dom);
         
+        this.init(dom);
         return dom;
     }
 
@@ -139,7 +152,6 @@ class Canvas{
         this.width  = this.width  * ratioW;
         this.height = this.height * ratioH;
         this.adjust();
-        
     }
 
     save(){
@@ -148,8 +160,141 @@ class Canvas{
         this.img_data = this.ctx.getImageData(0, 0, w, h);
     }
 
+    append(obj){
+        obj.canvas = this;
+        this.objects[obj.id] = obj;
+        this.list.push(obj);
+        return this.sort(this.list);
+    }
+
+    remove(obj){
+        delete this.objects[obj.id];
+        this.list = this.list.filter(o => o.id === obj.id);
+        return this.sort(this.list);
+    }
+
+    sort(){
+        this.list = this.list.sort((a,b) => a.z - b.z);
+        return this.list;
+    }
+
+    draw(){
+        for(let o of this.list){
+            o.draw();
+        }
+    }
+
+    init(dom=this.dom){
+        const self = this;
+        dom.addEventListener("click",function(e){
+            for(let o of self.list){
+                console.log(o.isMouseOver(e));
+            }
+        });
+        dom.addEventListener("contextmenu",function(e){
+            console.log(e.offsetX,e.offsetY);
+        
+        });
+        dom.addEventListener("mouseover",function(e){
+            console.log(e.offsetX,e.offsetY);        
+        });
+        dom.addEventListener("mouseout",function(e){
+            console.log(e.offsetX,e.offsetY);
+        });
+    }
+
 }
 
+class CanvasObject{
+    static cnt = 0;
+
+    static isCollide(o1,o2){
+        if(o1 === o2 || o1.is_active === false || o2.is_active === false){ return false;}
+        return !(
+            o1.right < o2.left || // o1がo2の左側にある
+            o1.left > o2.right || // o1がo2の右側にある
+            o1.bottom < o2.top || // o1がo2の上側にある
+            o1.top > o2.bottom    // o1がo2の下側にある
+        )
+    }
+
+    constructor(x=0,y=0,z=0,w=0,h=0,option={}){
+        this.id = CanvasObject.cnt++;
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+        this.h = h;
+        this.option = option;
+        this.canvas = null;
+        this.is_resize  = true;
+        this.is_active  = true;
+        this.is_visible = true;
+    }
+
+    get left(){
+        return this.x;
+    }
+
+    get right(){
+        return this.x + this.w;
+    }
+
+    get top(){
+        return this.y;
+    }
+
+    get bottom(){
+        return this.y + this.h;
+    }
+
+    draw(){
+        if(this.is_visible === false){ return; }
+        this.canvas.ctx.beginPath();
+        this.canvas.fillStyle = "black";
+        this.canvas.ctx.fillRect(this.x,this.y,this.w,this.h);
+        // this.canvas.ctx.strokeRect();
+
+    }
+
+    resize(ratioW,ratioH){
+        if(this.is_resize === false){ return; }
+        this.x = this.x * ratioW;
+        this.y = this.y * ratioH;
+        this.draw();
+    }
+
+    isCollide(obj){
+        if(this === obj || this.is_active === false || obj.is_active === false){ return false;}
+        return !(
+            this.right < obj.left || // thisがobjの左側にある
+            this.left > obj.right || // thisがobjの右側にある
+            this.bottom < obj.top || // thisがobjの上側にある
+            this.top > obj.bottom    // thisがobjの下側にある
+        )
+    }
+
+    isMouseOver(e){
+        if(this.is_active === false){ return false;}
+        const mouseX = this.canvas ? this.canvas.mouseX : 16;
+        const mouseY = this.canvas ? this.canvas.mouseY : 16;
+        return !(
+            this.right < e.offsetX || // thisがobjの左側にある
+            this.left > e.offsetX + mouseX   || // thisがobjの右側にある
+            this.bottom < e.offsetY + mouseY || // thisがobjの上側にある
+            this.top > e.offsetY                // thisがobjの下側にある
+        );
+
+    }
+
+}
+
+class CanvasMouse extends CanvasObject{
+    constructor(x=0,y=0,z=0,w=0,h=0,option={}){
+        super(x,y,z,w,h,option);
+    }
+
+}
 
 /**
  * リサイズにより画面外になってしまうと描画データが消えてしまう。
