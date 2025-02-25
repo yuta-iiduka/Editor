@@ -1,0 +1,11 @@
+{% extends "_base.html" %}
+{% block title %}Frame{% endblock %}
+{% block css %}{% endblock %}
+
+{% block content %}
+    <iframe src="{{url_for('doodle.doodle')}}" style="height:100%; width: 100%;"></iframe>
+{% endblock %}
+
+{% block script %}
+    <!-- <script src="{{url_for('static',filename='js/_/canvas.js')}}"></script> -->
+{% endblock %}

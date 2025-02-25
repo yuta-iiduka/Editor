@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+	<head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="Cache-Control" content="no-cache">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta http-equiv="content-language" content="ja">
+		<meta name="robots" content="noindex, nofollow">
+		<meta name="csrf_token" value="{{ csrf_token() }}">
+
+		<title>EDITOR【{% block title %}{% endblock %}】</title>
+		
+		<link rel="stylesheet" href="{{url_for('static',filename='css/_base.css')}}"/>
+		{% block css %}{% endblock %}
+
+		<link rel="shortcut icon"     type="image/png" href="{{url_for('static',filename='img/icon.png')}}" />
+		<link rel="apple-touch-icon"  type="image/png" href="{{url_for('static',filename='img/icon.png')}}" />
+		<link rel="icon"              type="image/png" href="{{url_for('static',filename='img/icon.png')}}" />
+
+	</head>
+	
+	<body>
+        <div class="content">
+        	<div class="side"><div id="sidebar-btn" class="sidebar-btn">&#9655;</div>{% include "_tool.html" %}</div>
+            <div class="main">
+				<div class="head"></div>
+				<div class="body">{% block content %}{% endblock %}</div>
+				<div class="foot"></div>
+			</div>
+            <script>
+				const mHead = document.querySelector(".content .head");
+				const mBody = document.querySelector(".content .body");
+				const mFoot = document.querySelector(".content .foot");
+                const side = document.querySelector(".content .side");
+                const sidebar_btn = document.querySelector(".content .side #sidebar-btn");
+				const tools = document.querySelectorAll(".content .tool");
+				let toolid = tools.length;
+                const active = "active";
+                const op = "&#9655"; // > &#9655;
+                const cl = "&#9665;"; // < &#9665;
+                let sidebar_status = 0; // 0:close, 1:open;
+				hide_tools();
+                sidebar_btn.addEventListener("click",function(){
+                    if(sidebar_status === 0){
+                        sidebar_status = 1;
+                        side.classList.add(active);
+                        sidebar_btn.innerHTML = cl;
+						sidebar_btn.classList.add("active");
+						show_tools();
+                    }else{
+                        sidebar_status = 0;
+                        side.classList.remove(active);
+                        sidebar_btn.innerHTML = op;
+						sidebar_btn.classList.remove("active");
+						hide_tools();
+                    }
+                });
+
+				function hide_tools(){
+					for(let t of tools){
+							t.style.display ="none";
+					}
+				}
+
+				function show_tools(){
+					for(let t of tools){
+						t.style.display ="inline-block";
+					}
+				}
+
+				function append_tool(dom,src="",explanation=""){
+					const div = document.createElement("div");
+					div.id = toolid++;
+					div.title = explanation;
+					if(src === ""){
+						div.appendChild(document.createTextNode("●"));
+					}else if(typeof(icon)==="string"){
+						const img = document.createElement("img");
+						img.src = src;
+						img.style.width = "24px";
+						img.style.height = "24px";
+						img.style.display = "inline-block";
+						div.appendChild(img);
+					}else{
+						div.appendChild(src);
+					}
+					dom.appendChild(div);
+					return div;
+				}
+
+				function append_side_tool(src="",explanation="TOOL"){
+					const div = append_tool(side,src,explanation);
+					const exp = document.createElement("div");
+					exp.style.display = "inline-block";
+					exp.title = explanation;
+					exp.innerHTML = explanation;
+					div.appendChild(exp);
+					return div;
+				}
+
+				function append_head_tool(src="",explanation="TOOL"){
+					const div = append_tool(mHead,src,explanation);
+					const exp = document.createElement("div");
+					exp.style.display = "inline-block";
+					exp.title = explanation;
+					div.appendChild(exp);
+					return div;
+				}
+
+				function append_foot_tool(src="",explanation="TOOL"){
+					const div = append_tool(mFoot,src,explanation);
+					const exp = document.createElement("div");
+					exp.style.display = "inline-block";
+					exp.title = explanation;
+					div.appendChild(exp);
+					return div;
+				}
+
+				function remove_tool(toolid){
+					try{
+						const t = side.querySelector(`#${toolid}`);
+						if(t !== null){
+							t.remove();
+						}
+						return true;
+					}catch(e){
+						console.error(e);
+						return false;
+					}
+				}
+
+            </script>
+        </div>
+
+		{% include "_script.html" %}		
+		{% block script %}{% endblock %}
+	</body>
+</html>
