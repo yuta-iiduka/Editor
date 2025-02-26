@@ -6,6 +6,8 @@ class Validation():
 
     UNEXPECTED_ERROR = "予期しないエラーです"
 
+    #TODO 日付チェック、文字数制限チェック（正規表現？）
+
     @classmethod
     def check_min_value(cls,min,val):
         """最小値は{}です"""
@@ -56,6 +58,16 @@ class Validation():
     def check_not_null(cls,v):
         """値がありません"""
         return v is None
+    
+    @classmethod
+    def check_null(cls,v):
+        """値があります"""
+        return v is not None
+    
+    @classmethod
+    def check_required(cls,v):
+        """必須入力です"""
+        return v is None or v == ""
 
     def __init__(self, data):
         self.data = data
@@ -118,6 +130,54 @@ class Check:
                         if result:
                             cls.messages[n] = cls.format(checker.__doc__,v)
                             cls.result = False
+                            break
+
+                ret = None
+                if cls.result == False and cls.is_fast == True:
+                    kwargs["messages"] = cls.messages
+                    kwargs["result"] = cls.result
+                    args = args + cls.arguments
+                    kwargs = {**kwargs , **cls.keywords}
+                    ret = cls.injection(*args, **kwargs) if callable(cls.injection) else func(*args, **kwargs)
+                elif cls.result == False and cls.is_late == True:
+
+                    #オリジナル関数の場合
+                    if func is inspect.unwrap(func):
+                        kwargs["messages"] = cls.messages
+                        kwargs["result"] = cls.result
+                        args = args + cls.arguments
+                        kwargs = {**kwargs , **cls.keywords}
+                        ret = cls.injection(*args, **kwargs) if callable(cls.injection) else func(*args, **kwargs)
+                    
+                    #ラッピング関数の場合
+                    else:
+                        ret = func(*args, **kwargs) if callable(cls.injection) else func(*args, **kwargs)
+                elif cls.result == True:
+                    ret = func(*args, **kwargs)
+                else:
+                    ret = func(*args, **kwargs)
+
+                return ret
+            return wrapper
+        return dec
+    
+    @classmethod
+    def compare(cls,checker,n1,n2):
+        def dec(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                sig = inspect.signature(func)
+                bound_args = sig.bind(*args, **kwargs)
+                bound_args.apply_defaults()
+                v1 = bound_args.arguments[n1] if n1 in bound_args.arguments else None
+                v2 = bound_args.arguments[n2] if n2 in bound_args.arguments else None
+
+                result = True
+                if v1 is not None and v2 is not None:
+                    result = checker(v1,v2)
+                    if result:
+                        cls.messages["{}|{}".format(n1,n2)] = cls.format(checker.__doc__, [v1,v2])
+                        cls.result = False
 
                 ret = None
                 if cls.result == False and cls.is_fast == True:
@@ -165,11 +225,15 @@ class Check:
         return cls.inspect(cls.vc.check_not_null,n)
     
     @classmethod
-    def equal(cls,n):
+    def equal(cls,n1,n2):
+        """ 指定した引数の配列内の２つの要素が等しいことをチェックする関数デコレータ
+        Args:
+            n(string):名前 値が配列[v1,v2]であることを前提とする
+        Returns:
+            function
         """
-        n:名前 値が配列[v1,v2]であることを前提とする
-        """
-        return cls.inspect(cls.vc.check_equal_value,n)
+        return cls.compare(cls.vc.check_equal_value,n1,n2)
+    
     
     @classmethod
     def regex(cls,n,v="[A-Za-z0-9]+"):
@@ -240,12 +304,14 @@ class Check:
     def invoke(cls,checker,baseV,argV):
         result = True
         if callable(checker):
-            if isinstance(argV,dict) and checker != cls.vc.check_not_null:
-                result = checker(baseV,**argV.values()) if baseV is not None else checker(**argV.values())
-            elif isinstance(argV,list) and checker != cls.vc.check_not_null:
-                result = checker(baseV,*argV) if baseV is not None else checker(*argV)
-            else:
-                result = checker(baseV,argV) if baseV is not None else checker(argV)
+            # if isinstance(argV,dict) and checker != cls.vc.check_not_null:
+            #     result = checker(baseV,**argV.values()) if baseV is not None else checker(**argV.values())
+            # elif isinstance(argV,list) and checker != cls.vc.check_not_null:
+            #     result = checker(baseV,*argV) if baseV is not None else checker(*argV)
+            # else:
+            #     result = checker(baseV,argV) if baseV is not None else checker(argV)
+            result = checker(baseV,argV) if baseV is not None else checker(argV)
+            
         else:
             cls.messages["checker_error"] = cls.CHECKER_ERROR
         return result
@@ -286,7 +352,7 @@ def test(*args, **kwargs):
 @Check.min("x",19)
 @Check.max("x",77)
 @Check.not_null("y")
-@Check.equal("y")
+@Check.equal("y","z")
 @Check.regex("z")
 def sample(x,y,z):
     print(x)
@@ -302,7 +368,7 @@ def sample(x,y,z):
 @Check.min("x",19)
 @Check.max("x",77)
 @Check.not_null("y")
-@Check.equal("y")
+@Check.equal("y","z")
 @Check.regex("z")
 def sample2(x,y,z):
     print(x)
@@ -314,6 +380,6 @@ def sample2(x,y,z):
 
 
 if __name__ == "__main__":
-    sample2(55,y=[None,1],z="あああ")
+    sample2(55,y="あああ",z="あああ")
     sample(13,y=[None,1],z="あああ")
-    sample2(44,y=[None,1],z="iii")
+    sample2(44,y=None,z="iii")
