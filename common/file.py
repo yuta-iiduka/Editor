@@ -1,6 +1,6 @@
 #標準ライブラリ
 import json,csv
-
+import xml.etree.ElementTree as ET
 
 class FileData():
 
@@ -106,12 +106,44 @@ class CSVData(FileData):
         writer.writerows(self.data)
         # csv.DictWriter(file, fieldnames=["field1","field2"])
 
+
+class XMLData(FileData):
+    def __init__(self,file_path,encoding="utf-8"):
+        super().__init__(file_path,encoding)
+        self.tree = None
+    
+    def _read(self,file):
+        self.tree = ET.parse(self.file_path)
+        self.data = self.tree.getroot()
+
+    def _write(self,file):
+        self.tree.write(self.file_path,encoding=self.encoding,xml_declaration=True)
+
+    def findall(self,name):
+        return self.data.findall(name)
+
+    def find(self,name,key,val):
+        items = self.findall(name)
+        target = None
+        for item in items:
+            if item.get(key) == val:
+                target = item
+        return target
+    
+    def append(self,itemName,attributes,text):
+        elm = ET.Element(itemName,attributes)
+        elm.text = text
+        self.data.append(elm)
+        return elm
+
 class JsonEnv(JsonData):
     def __init__(self):
         super().__init__("param/env.json")
         self.env = self.data["env"]
 
 if __name__ == "__main__":
-    TextData("param/const.json")  
-    JsonEnv()
-    CSVData("sample.csv")
+    # TextData("param/const.json")  
+    # JsonEnv()
+    # CSVData("sample.csv")
+    d = XMLData("etc/sample.drawio.xml")
+
