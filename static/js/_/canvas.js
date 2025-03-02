@@ -5,7 +5,7 @@ class Canvas{
     static list = [];
     static active_canvas = null;
     static COLOR = {
-        BLACK:"black", WHITE:"white", ORANGE:"orange",
+        None:"none", BLACK:"black", WHITE:"white", ORANGE:"orange",
     }
     static SIZE = {
         XLARGE:"100", LARGE:"80", NORMAL:"60", HALF:"50", SMALL:"40", XSMALL:"20", NONE: "0",
@@ -36,13 +36,13 @@ class Canvas{
         })
     }
 
-    constructor(selector){
-        this.parent = document.querySelector(selector);
+    constructor(selector,wrap=false){
         this.id = Canvas.cnt++;
-        this.dom = this.build();
+        this.parent = wrap===false ? document.querySelector(selector) : null;
+        this.dom = wrap===false ? this.build() : this.wrap(document.querySelector(selector));
         this.ctx = this.dom.getContext("2d");
         this.color = Canvas.COLOR.BLACK;
-        this.backgroundColor = Canvas.COLOR.ORANGE;
+        this._backgroundColor = Canvas.COLOR.ORANGE; //Canvas.COLOR.None;
         this.per = Canvas.PER.PERCENT;
         this.height = `${Canvas.SIZE.XLARGE}`;
         this.width = `${Canvas.SIZE.XLARGE}`;
@@ -54,6 +54,14 @@ class Canvas{
         this.adjust();
 
         Canvas.list.push(this);
+    }
+
+    style(option={}){
+        if(this.dom === undefined || this.dom === null){ return;}
+
+        for(let o of Object.keys(option)){
+            this.dom.style[o] = option[o];
+        }
     }
 
     get color(){
@@ -100,6 +108,19 @@ class Canvas{
         this.dom.style.width = this._width;
     }
 
+    get name(){
+        return this.constructor.name.toLowerCase();
+    }
+
+    /**
+     * CANVASをラップ
+     */
+    wrap(dom){
+        dom.id = `${this.name}${this.id}`;
+        dom.classList.add("canvas");
+        this.init(dom);
+        return dom;
+    }
 
     /**
      * CANVASタグの返却
@@ -107,10 +128,9 @@ class Canvas{
      */
     build(){
         const dom  = document.createElement("canvas");
-        dom.id = `canvas${this.id}`;
+        dom.id = `${this.name}${this.id}`;
         dom.classList.add("canvas");
         this.parent.appendChild(dom);
-        
         this.init(dom);
         return dom;
     }
@@ -129,7 +149,6 @@ class Canvas{
         if(this.img_data !== null){
             this.ctx.putImageData(this.img_data,0,0);
         }
-        
     }
 
     /**
@@ -174,7 +193,7 @@ class Canvas{
     }
 
     sort(){
-        this.list = this.list.sort((a,b) => a.z - b.z);
+        this.list = this.list.sort((a,b) => b.z - a.z);
         return this.list;
     }
 
@@ -189,18 +208,44 @@ class Canvas{
         dom.addEventListener("click",function(e){
             for(let o of self.list){
                 console.log(o.isMouseOver(e));
+                if(o.isMouseOver(e)){
+                    typeof(o.click) === "function" ? o.click(e) : null;
+                    break;
+                }
             }
         });
         dom.addEventListener("contextmenu",function(e){
             console.log(e.offsetX,e.offsetY);
-        
+            for(let o of self.list){
+                console.log(o.isMouseOver(e));
+                if(o.isMouseOver(e)){
+                    typeof(o.contextmenu) === "function" ? o.contextmenu(e) : null;
+                    break;
+                }
+            }
         });
-        dom.addEventListener("mouseover",function(e){
-            console.log(e.offsetX,e.offsetY);        
+        dom.addEventListener("mousemove",function(e){
+            for(let o of self.list){
+                if(o.isMouseOver(e)){
+                    typeof(o.mousemove) === "function" ? o.mousemove(e) : null;
+                    o.is_focused = true;
+                    break;
+                }else{
+                    if(o.is_focused === true){
+                        o.is_focused = false;
+                        typeof(o.mouseout) === "function" ? o.mouseout(e) : null;
+                        break;
+                    }
+                }
+            }        
         });
         dom.addEventListener("mouseout",function(e){
-            console.log(e.offsetX,e.offsetY);
+            for(let o of self.list){
+                o.is_focused = false;
+                typeof(o.mouseout) === "function" ? o.mouseout(e) : null;
+            }
         });
+        return dom;
     }
 
 }
@@ -230,6 +275,7 @@ class CanvasObject{
         this.is_resize  = true;
         this.is_active  = true;
         this.is_visible = true;
+        this.is_focused = false;
     }
 
     get left(){
@@ -284,7 +330,22 @@ class CanvasObject{
             this.bottom < e.offsetY + mouseY || // thisがobjの上側にある
             this.top > e.offsetY                // thisがobjの下側にある
         );
+    }
 
+    click(e){
+        console.log("clicked", e.offsetX, e.offsetY);
+    }
+
+    contextmenu(e){
+        console.log("contextmenu", e.offsetX, e.offsetY);
+    }
+
+    mousemove(e){
+        console.log("mousemoved", e.offsetX, e.offsetY);
+    }
+
+    mouseout(e){
+        console.log("mouseout", e.offsetX, e.offsetY);
     }
 
 }
@@ -294,6 +355,18 @@ class CanvasMouse extends CanvasObject{
         super(x,y,z,w,h,option);
     }
 
+    draw(){
+        this.canvas.ctx.beginPath();
+        this.canvas.ctx.arc()
+    }
+}
+
+class Overlay extends Canvas{
+    constructor(selector,option={opacity:0.5}){
+        super(selector);
+        this.dom.style.pointerEvents = "none";
+        this.style(option);
+    }
 }
 
 /**
@@ -301,7 +374,6 @@ class CanvasMouse extends CanvasObject{
  * 固定値のサイズに変更すればOKか？
  */
 class Doodle extends Canvas{
-
 
     constructor(selector){
         super(selector);

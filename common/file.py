@@ -67,7 +67,6 @@ class FileData():
   
     @data.setter
     def data(self,data):
-        print(data)
         self._data = data
 
 
@@ -91,6 +90,17 @@ class TextData(FileData):
     def _write(self, file):
         file.write(self.data)
 
+class TextLineData(FileData):
+    def __init__(self,file_path):
+        super().__init__(file_path)
+
+    def _read(self, file):
+        self.data = file.readlines()
+
+    def _write(self, file):
+        file.writelines(self.data)
+
+
 class CSVData(FileData):
     def __init__(self,file_path,encoding="utf-8-sig"):
         super().__init__(file_path,encoding)
@@ -109,14 +119,15 @@ class CSVData(FileData):
 
 class XMLData(FileData):
     def __init__(self,file_path,encoding="utf-8"):
-        super().__init__(file_path,encoding)
         self.tree = None
+        super().__init__(file_path,encoding)
     
     def _read(self,file):
         self.tree = ET.parse(self.file_path)
         self.data = self.tree.getroot()
 
     def _write(self,file):
+        ET.indent(self.tree,space="  ")
         self.tree.write(self.file_path,encoding=self.encoding,xml_declaration=True)
 
     def findall(self,name):
@@ -130,10 +141,11 @@ class XMLData(FileData):
                 target = item
         return target
     
-    def append(self,itemName,attributes,text):
+    def create(self,itemName,attributes={},text=None):
         elm = ET.Element(itemName,attributes)
-        elm.text = text
-        self.data.append(elm)
+        if text is not None:
+            elm.text = text
+        # self.data.append(elm)
         return elm
 
 class JsonEnv(JsonData):

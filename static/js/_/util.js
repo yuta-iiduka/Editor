@@ -177,6 +177,9 @@ class Grid{
         Grid.list.push(this);
     }
 
+    /**
+     * {x,y,z,w,h,resize,draw}
+     */
     get objects(){
         return Object.values(this._objects);
     }
@@ -209,7 +212,7 @@ class Grid{
         dom.style.position = "fixed";
         dom.addEventListener("mouseup",function(){
             self.draw();
-        })
+        });
         return dom;
     }
     
@@ -233,8 +236,8 @@ class Grid{
     }
 
     fit(o){
-        const w = this.w / Grid.windowRatio.w;
-        const h = this.h / Grid.windowRatio.h;
+        const w = o.resizable === true ? this.w / Grid.windowRatio.w : this.w;
+        const h = o.resizable === true ? this.h / Grid.windowRatio.h : this.h;
         if(o.x % w > w / 2){
             o.x = (Math.floor(o.x / w) + 1) * w;
         }else{
@@ -322,6 +325,37 @@ class Grid{
 
 }
 
+class GridWide extends Grid{
+    static defaultW = Grid.width / 32;
+    static defaultH = Grid.height / 32;
+    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector){
+        super(x,y,selector);
+        this._x = x;
+        this._y = y;
+        this._w = w;
+        this._h = h;
+        // this.dom.style.overflow = "auto";
+    }
+
+    append(id,obj){
+        obj.resizable = false;
+        return super.append(id,obj);
+    }
+
+    get w(){
+        return this._w;
+    }
+
+    get h(){
+        return this._h;
+    }
+
+
+}
+
+/**
+ * TODO:Touch機能にも対応できるようにする
+ */
 class Sticky{
     static{
         this.cnt = 0;
@@ -329,6 +363,7 @@ class Sticky{
         this.focused = null;
         this.mouseX = 0;
         this.mouseY = 0;
+        // TODO
         document.body.addEventListener("mousedown",function(e){
             Sticky.mouseX = e.pageX;
             Sticky.mouseY = e.pageY;
@@ -352,7 +387,7 @@ class Sticky{
         canvas.style.left = "0px";
         canvas.style.top  = "0px";
         canvas.style.pointerEvents = "none";
-
+        // TODO
         window.addEventListener("resize",function(){
             canvas.width = Sticky.canvas.offsetWidth;
             canvas.height = Sticky.canvas.offsetHeight;
@@ -636,6 +671,8 @@ class Sticky{
         // frame
         this.frame = frame;
         this.pack = pack;
+
+        // TODO PC スマホ版での対応
         this.event();
 
         return pack;
@@ -677,10 +714,10 @@ class Sticky{
             Sticky.focus();
 
             const base = self.pack.getClientRects()[0];
-            baseL = base.left;   
-            baseT = base.top;
-            baseW = base.width;
-            baseH = base.height;
+            baseL = base.left - self.borderWidth;   
+            baseT = base.top - self.borderWidth;
+            baseW = base.width - self.borderWidth;
+            baseH = base.height - self.borderWidth;
 
             // リサイズ方向
             if(is_frame === false && is_pack === true){
