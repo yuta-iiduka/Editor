@@ -130,11 +130,11 @@ class XMLData(FileData):
         ET.indent(self.tree,space="  ")
         self.tree.write(self.file_path,encoding=self.encoding,xml_declaration=True)
 
-    def findall(self,name):
-        return self.data.findall(name)
+    def findall(self,path):
+        return self.data.findall(path)
 
-    def find(self,name,key,val):
-        items = self.findall(name)
+    def find(self,path,key,val):
+        items = self.findall(path)
         target = None
         for item in items:
             if item.get(key) == val:

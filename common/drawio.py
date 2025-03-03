@@ -3,11 +3,19 @@ import xml.etree.ElementTree as ET
 
 
 class DrawIO(XMLData):
+    STYLE = {
+        "FRAME":"shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;fontStyle=5;overflow=hidden;whiteSpace=wrap;html=1;",
+        "LEFT":"shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;fontStyle=1;overflow=hidden;whiteSpace=wrap;html=1;",
+        "RIGHT":"shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;fontStyle=5;overflow=hidden;whiteSpace=wrap;html=1;",
+        "ROW":"shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;fillColor=none;collapsible=0;dropTarget=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;top=0;left=0;right=0;bottom=0;html=1;",
+        "BORDERROW":"shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;fillColor=none;collapsible=0;dropTarget=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;top=0;left=0;right=0;bottom=1;html=1;",
+    }
 
     def __init__(self,file_path,encoding="utf-8"):
         super().__init__(file_path,encoding)
         self.drawio_init()
         self.index = 0
+        self._target = None
 
     def drawio_init(self):
         if self.data is None:
@@ -17,6 +25,14 @@ class DrawIO(XMLData):
             f.data.append('</mxfile>')
             f.write()
             self.read()
+
+    def find(self,path,key,val):
+        items = self.root.findall(path)
+        target = None
+        for item in items:
+            if item.get(key) == val:
+                target = item
+        return target
 
     @property
     def pages(self):
@@ -45,7 +61,28 @@ class DrawIO(XMLData):
                     <root>
         ```
         """
-        return self.page.find(".//root")
+        return self.findall(".//root")[self.index]
+    
+    @property
+    def cel0(self):
+        return self.page.find(".//mxCell","id","0")
+    
+    @property
+    def cel1(self):
+        return self.page.find(".//mxCell","id","1")
+    
+    @property
+    def target(self):
+        result = None
+        if self._target is not None:
+            result = self._target
+        else:
+            result = self.root
+        return result
+    
+    @target.setter
+    def target(self,dom):
+        self._target = dom
     
     def id(self,name):
         return {"id":"{}-{}-{}".format(self.page.get("id"),name,len(self.page.findall(".//{}".format(name))))}
@@ -77,7 +114,7 @@ class DrawIO(XMLData):
         page: ページの有効化（1: 有効, 0: 無効）
         pageWidth / pageHeight: ページサイズ
         """
-        properties = {"dx":"1434", "dy":"837", "grid":"1", "gridSize":"10", "guides":"1", "tooltips":"1", "connect":"1", "arrows":"1", "fold":"1", "page":"1", "pageScale":"1", "pageWidth":"827", "pageHeight":"1169", "math":"0", "shadow":"0"}
+        # properties = {"dx":"1434", "dy":"837", "grid":"1", "gridSize":"10", "guides":"1", "tooltips":"1", "connect":"1", "arrows":"1", "fold":"1", "page":"1", "pageScale":"1", "pageWidth":"827", "pageHeight":"1169", "math":"0", "shadow":"0"}
         graph_model = self.create("mxGraphModel",properties)
         self.page.append(graph_model)
         graph_model.append(self.create("root"))
@@ -87,15 +124,7 @@ class DrawIO(XMLData):
         self.root.append(cell0)
         self.root.append(cell1)
         return graph_model
-    
-    def ER(self,x="100",y="100",w="120",h="40"):
-        cel = self.cell({**self.id("mxCell"),**{"value":"text","vertex":"1"}})
-        geom = self.geometry({"x":x,"y":y,"width":w,"height":h,"as":"geometry"})
-        rect = self.rectangle({"width":w,"height":h,"as":"alternateBounds"})
-        cel.append(geom)
-        geom.append(rect)
-        self.root.append(cel)
-        return cel
+
 
     def cell(self,properties={}):
         """ ### mxCellを生成するメソッド
@@ -111,8 +140,7 @@ class DrawIO(XMLData):
         name = "mxCell"
         # props = {"id":"{}-{}-{}".format(self.page.get("id"),name,len(self.page.findall(".//{}".format(name))))}
         props = self.id(name)
-        'style="shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;overflow=hidden;html=1;whiteSpace=wrap;" vertex="1" parent="IOiHGi2NvYUc58dHJvdS-25"'
-        mx_cell = self.create("mxCell",{**props,**properties})
+        mx_cell = self.create("mxCell",{**props,**properties,**{"vertex":"1","parent":self.target.get("id") if self.target != self.root else "1"}})
         return mx_cell
     
     def geometry(self,properties={}):
@@ -126,10 +154,10 @@ class DrawIO(XMLData):
         name = "mxGeometry"
         props = self.id(name)
         # props = {"id":"{}-{}-{}".format(self.page.get("id"),name,len(self.page.findall(".//{}".format(name))))}
-        geometry = self.create("mxGeometry",{**props,**properties})
+        geometry = self.create("mxGeometry",{**props, **properties, **{"as":"geometry"}})
         return geometry
     
-    def point(self,properties={}):
+    def point(self,properties={"x":"360","y":"480","as":"sourcePoint"}):
         """ ### mxPoint(mxGeometryの子要素)を生成するメソッド
         x: X座標
         y: Y座標
@@ -152,10 +180,78 @@ class DrawIO(XMLData):
         name = "mxRectangle"
         props = self.id(name)
         # props = {"id":"{}-{}-{}".format(self.page.get("id"),name,len(self.page.findall(".//{}".format(name))))}
-        r = self.create("mxRectangle",{**props, **properties})
+        r = self.create("mxRectangle",{**props, **properties, **{"as":"alternateBounds"}})
         return r
+
+    def frame(self,title="",x="100",y="100",w="120",h="40"):
+        cel = self.cell({**self.id("mxCell"),**{"value":title,"vertex":"1","style":DrawIO.STYLE["FRAME"]}})
+        geom = self.geometry({"x":x,"y":y,"width":w,"height":h})
+        rect = self.rectangle({"width":w,"height":h})
+        cel.append(geom)
+        geom.append(rect)
+        self.root.append(cel)
+        return cel
+
+    def entity(self,point,data):
+        x = point["x"]
+        y = point["y"]
+        w = point["width"]
+        h = point["height"]
+        frame = self.frame(data["name"],str(x),str(y),str(w),str(h))
+        cols = data["columns"]
+        for d in cols:
+            y += 30
+            row_h = 30
+            rh = str(row_h)
+            # ターゲットをフレームにする
+            self.target = frame
+            style=DrawIO.STYLE["ROW"]
+            if d == cols[-1]:
+                style = DrawIO.STYLE["BORDERROW"]
+            row = self.cell({**self.id("mxCell"),**{"y":str(y),"width":str(w),"height":rh,"value":"","vertex":"1","style":style}})
+            self.root.append(row)
+
+            # ターゲットを行にする
+            self.target = row
+            left = self.cell({**self.id("mxCell"),**{"value":",".join(d["option"]),"vertex":"1","style":DrawIO.STYLE["LEFT"]}})
+            self.root.append(left)
+            right = self.cell({**self.id("mxCell"),**{"value":d["name"],"vertex":"1","style":DrawIO.STYLE["RIGHT"]}})
+            self.root.append(right)
+
+            # ターゲットを左セルにする
+            self.target = left
+            lw = str(int(w * 0.2))
+            lgeom = self.geometry({"width":lw,"height":rh})
+            lrect = self.rectangle({"width":lw,"height":rh})
+            lgeom.append(lrect)
+            left.append(lgeom)
+
+            # ターゲットを右セルにする
+            self.target = right
+            rw = str(int(w * 0.8))
+            rgeom = self.geometry({"width":rw,"height":rh,"x":lw})
+            rrect = self.rectangle({"width":rw,"height":rh})
+            rgeom.append(rrect)
+            right.append(rgeom)
+
+        self.target = self.root
+        return frame
         
 if __name__ == "__main__":
+    point = {
+        "x":100,
+        "y":100,
+        "width":180,
+        "height":200,
+    }
+    data = {
+        "name":"Table",
+        "columns":[
+            {"option":["PK","FK"],"name":"COLUMN1"},
+            {"option":["PK",],"name":"COLUMN2"},
+            {"option":[],"name":"COLUMN3"},
+        ],
+    }
     dio = DrawIO("etc/sample.drawio.xml")
-    doms = [dio.pg("xxxxxx"),dio.graph(),dio.ER()]
+    doms = [dio.pg("xxxxxx"),dio.graph(),dio.entity(point,data)]
     dio.write()
