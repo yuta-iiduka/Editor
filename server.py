@@ -17,6 +17,7 @@ from _scheduler import task
 from _doodle import doodle
 from _user import user
 from _debugger import debugger
+from _blog import blog
 
 
 app = Flask(__name__)
@@ -42,6 +43,7 @@ task.aps.start()
 app.register_blueprint(doodle.app)
 app.register_blueprint(user.app)
 app.register_blueprint(debugger.app)
+app.register_blueprint(blog.app)
 
 
 @app.route("/",methods=["GET"])

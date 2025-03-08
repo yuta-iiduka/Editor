@@ -132,7 +132,6 @@ class DOM {
         this.parent.appendChild(this.frame);
         return this.frame;
     }
-
 }
 
 console.log("grid.js is called.")
@@ -170,6 +169,7 @@ class Grid{
         this.baseFontSize = Platform.isPC() ? Grid.width / 100 : Grid.width / 50;
         this.dom = this.make(selector);
         this.fontSize = this.baseFontSize;
+        this.fontResize = true;
         this._objects = {};
 
         this.draw();
@@ -317,7 +317,10 @@ class Grid{
         }
 
         // フォントサイズを変更
-        this.fontSize = Grid.windowRatio.w * this.baseFontSize;
+        if(this.fontResize === true){
+            this.fontSize = Grid.windowRatio.w * this.baseFontSize;
+
+        }
 
         // グリッドの再描画
         this.draw();
@@ -328,7 +331,7 @@ class Grid{
 class GridWide extends Grid{
     static defaultW = Grid.width / 32;
     static defaultH = Grid.height / 32;
-    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector){
+    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body"){
         super(x,y,selector);
         this._x = x;
         this._y = y;
@@ -350,7 +353,534 @@ class GridWide extends Grid{
         return this._h;
     }
 
+}
 
+class GridLocal extends GridWide{
+    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body"){
+        super(x,y,w,h,selector);
+        this._x = x;
+        this._y = y;
+        this._w = w;
+        this._h = h;
+        this.dom.style.position = "absolute";
+    }
+
+}
+
+class Block{
+    static{
+        this.cnt = 0;
+        this.list = [];
+        this.focused = null;
+        this.mouseX = 0;
+        this.mouseY = 0;
+        // TODO touch
+        document.body.addEventListener("mousedown",function(e){
+            Block.mouseX = e.pageX;
+            Block.mouseY = e.pageY;
+        });
+        this.MAX_ZINDEX = 1;
+        this.MIN_ZINDEX = 0;
+        
+    }
+
+    static focus(){
+        for(let s of Block.list){
+            if(s.focused === true){
+                s.z = Block.MAX_ZINDEX;
+            }else{
+                s.z = Block.MIN_ZINDEX;
+            }
+        }
+    }
+
+    constructor(x=10,y=10,z=1,w=5,h=5){
+        this.id = Block.cnt++;
+        // 座標情報
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+        this.h = h;
+        this.ratio = {w:1,h:1};
+        
+        // DOM情報
+        this.dom = null;
+        this.head = null;
+        this.foot = null;
+        this.menu = null;
+        this.body = null;
+        this.frame = null;
+        this.pack = null;
+        this.style = {
+            backgroundColor: "black",
+            color: "white",
+        };
+
+        this.focused = false;
+        this.active = false;
+        this.relations = {};
+
+        // 機能の有効化・無効化
+        this.movable = false;
+        this.resizable = true;
+        this.visible = true;
+
+        this._contextmenu = function(e){console.log(`${this.id}:contextmenu`)};
+        this._dblclick = function(e){console.log(`${this.id}:dblclick`)};
+        this._keydown = function(e){console.log(`${this.id}:keydown ${e.key}`)};
+        this._resize = null;
+
+        Block.list.push(this);
+        console.log(Block.list);
+    }
+
+    get borderWidth(){
+        return this.pack ? this.pack.style.borderWidth.split("px").join("") : 0;
+    }
+
+    set borderWidth(w){
+        if(this.pack){
+            this.pack.style.borderWidth = `${w}px`;
+        }
+    }
+
+    get borderColor(){
+        return this.pack ? this.pack.style.borderColor : "";
+    }
+
+    set borderColor(c){
+        if(this.pack){
+            this.pack.style.borderColor = c;
+        }
+    }
+
+    get name(){
+        return this.constructor.name.toLowerCase();
+    }
+
+    move(x,y){
+        this.x = x;
+        this.y = y;
+    }
+
+    size(w,h){
+        this.w = w;
+        this.h = h;
+    }
+
+    make(html="", editable=false){
+        // 仮想DOMから生成
+        this.dom = document.createElement("div");
+        if (typeof(html) === "string"){
+            this.dom.innerHTML = html;
+        }else{
+            this.dom.appendChild(html);
+        }
+        this.pickable(this.dom,editable);
+        this.dom.dataset.x = this.x;
+        this.dom.dataset.y = this.y;
+        this.dom.dataset.z = this.z;
+        this.dom.dataset.h = this.h;
+        this.dom.dataset.w = this.w;
+        return this;
+    }
+
+    wrap(selector, editable=false){
+        if(typeof(selector) === "string"){
+            // 既存DOMから生成
+            this.dom = document.querySelector(selector);
+        }else{
+            this.dom = selector;
+        }
+        
+        if(this.dom === null){ console.error("セレクタの指定を間違えています。"); }
+        const x = this.dom.dataset.x;
+        const y = this.dom.dataset.y;
+        const z = this.dom.dataset.z;
+        const w = this.dom.dataset.w;
+        const h = this.dom.dataset.h;
+
+        this.x = x === undefined ? this.x : x;
+        this.y = y === undefined ? this.y : y;
+        this.z = z === undefined ? this.z : z;
+        this.w = w === undefined ? this.w : w;
+        this.h = h === undefined ? this.h : h;
+        this.pickable(this.dom, editable);
+        return this;
+    }
+
+    relative(sticky){
+        this.relations[sticky.id] = sticky;
+        return this;
+    }
+
+    unrelative(sticky){
+        delete this.relations[sticky.id];
+        return this;
+    }
+
+    pickable(dom=document.createElement("div"),editable=true){
+        const self = this;
+        dom.setAttribute("contenteditable",editable);
+        dom.style.height = "100%";
+        dom.style.width = "100%";
+        const pack = document.createElement("div");
+        pack.style.position = "absolute";
+        pack.style.overflow = "hidden";
+        pack.style.border = "solid";
+        pack.style.borderWidth = "2px";
+        pack.style.borderRadius = "4px";
+        const frame = document.createElement("div");
+        frame.style.overflow = "hidden";
+        frame.style.height = "100%";
+        frame.style.width  = "100%";
+        const head = document.createElement("div");
+        head.style.height = "0px";
+        head.style.display = "flex";
+        head.style.justifyContent = "space-between";
+
+        const foot = document.createElement("div");
+        foot.style.height = "0px";
+        foot.style.display = "flex";
+        foot.style.justifyContent = "space-between";
+
+        const body = document.createElement("div");
+        body.style.overflowY = "auto";
+        body.style.textWrap = "wrap";
+        body.style.overflowWrap = "break-word";
+        body.style.height = "100%";
+
+        body.appendChild(dom);
+        frame.appendChild(head);
+        frame.appendChild(body);
+        frame.appendChild(foot);
+        pack.appendChild(frame);
+
+        // head
+        this.head = head;
+
+        // body
+        this.body = body;
+
+        // foot
+        this.foot = foot;
+
+        // frame
+        this.frame = frame;
+        this.pack = pack;
+
+        // TODO PC スマホ版での対応
+        this.event();
+
+        return pack;
+    }
+
+    event(){
+        const self = this;
+
+        // 前処理
+        // マウスによる物体の移動
+        let baseL = 0;
+        let baseT = 0;
+        this.frame.addEventListener("mousedown",function(e){
+            self.movable = true;
+            baseL = self.pack.offsetLeft;
+            baseT = self.pack.offsetTop;
+        });
+
+        // マウスによるリサイズ
+        let is_pack = false;
+        let is_frame = false;
+        let hold = "";
+        let baseW = 0;
+        let baseH = 0;
+        this.pack.addEventListener("mouseover",function(e){
+            is_pack = true;
+            Block.focused = self;
+        });
+        this.pack.addEventListener("mouseout",function(e){
+            is_pack = false;
+        });
+        this.pack.addEventListener("mousedown",function(e){
+
+            for(let s of Block.list){
+                s.focused = false;
+            }
+            self.focused = true;
+
+            Block.focus();
+
+            const base = self.pack.getClientRects()[0];
+            baseL = base.left   - self.borderWidth;   
+            baseT = base.top    - self.borderWidth;
+            baseW = base.width  - self.borderWidth;
+            baseH = base.height - self.borderWidth;
+
+            // リサイズ方向
+            if(is_frame === false && is_pack === true){
+                const rect = self.frame.getClientRects()[0];
+                if(e.pageX <= rect.left){
+                    hold = "left";
+                }else if( rect.right <= e.pageX){
+                    hold = "right";
+                }else if(e.pageY <= rect.top){
+                    hold = "top";
+                }else if( rect.bottom <= e.pageY){
+                    hold = "bottom";
+                }
+            }
+        });
+
+        this.frame.addEventListener("mouseover",function(e){
+            is_frame = true;
+        });
+        this.frame.addEventListener("mouseout",function(e){
+            is_frame = false;
+        });
+
+        // 中処理
+        document.body.addEventListener("mousemove",function(e){
+            // カーソル変更
+            if(is_frame === false && is_pack === true){
+                const rect = self.frame.getClientRects()[0];
+                if(e.pageX <= rect.left || rect.right <= e.pageX){
+                    self.pack.style.cursor = "ew-resize";
+                    
+                }
+                if( e.pageY <= rect.top || rect.bottom <= e.pageY){
+                    self.pack.style.cursor = "ns-resize";
+                }
+            }else{
+                self.pack.style.cursor = "auto";
+            }
+
+            // リサイズ
+            if(hold === "right"){
+                self.size(
+                    (e.pageX - Block.mouseX + baseW) / self.ratio.w,
+                    self.h,
+                );
+                self.resize_event(self.ratio);
+                self.draw();
+                window.getSelection().removeAllRanges();
+            }else if(hold === "left"){
+                self.move(
+                    (e.pageX - Block.mouseX + baseL) / self.ratio.w,
+                    self.y
+                )
+                self.size(
+                    (-e.pageX + Block.mouseX + baseW) / self.ratio.w,
+                    self.h,
+                );
+                self.resize_event(self.ratio);
+                self.draw();
+                window.getSelection().removeAllRanges();
+            }else if(hold === "top"){
+                self.move(
+                    self.x,
+                    (e.pageY - Block.mouseY + baseT) / self.ratio.h,
+                )
+                self.size(
+                    self.w,
+                    (-e.pageY + Block.mouseY + baseH) / self.ratio.h,
+                );
+                self.resize_event(self.ratio);
+                self.draw();
+                window.getSelection().removeAllRanges();
+            }else if(hold === "bottom"){
+                self.size(
+                    self.w,
+                    (e.pageY - Block.mouseY + baseH) / self.ratio.h,
+                );
+                self.resize_event(self.ratio);
+                self.draw();
+                window.getSelection().removeAllRanges();
+            }
+
+
+            // 位置変更
+            if(self.movable){
+                const offset = self.pack.parentElement.getClientRects()[0];
+                const offsetL = offset.left;
+                const offsetT = offset.top;
+                self.move(
+                    (e.pageX - offsetL - (Block.mouseX - baseL)) / self.ratio.w,
+                    (e.pageY - offsetT  - (Block.mouseY - baseT)) / self.ratio.h
+                );
+                self.draw();
+                window.getSelection().removeAllRanges();
+            }
+
+        });
+        
+        // 後処理
+        document.addEventListener("mouseup",function(e){
+            self.movable = false;
+            hold = "";
+        });
+
+        // コンテキストメニュー
+        this.pack.addEventListener("contextmenu",function(e){
+            e.preventDefault();
+            self._contextmenu(e);
+        });
+
+        // ダブルクリック
+        this.pack.addEventListener("dblclick",function(e){
+            self._dblclick(e);
+        });
+
+        // キー入力イベント
+        this.pack.addEventListener("keydown",function(e){
+            if(e.ctrlKey === true & e.shiftKey === true){
+                e.preventDefault();
+                self._keydown(e);
+            }
+        });
+
+    }
+
+    remove(){
+        this.pack.remove();
+    }
+
+    draw(){
+        const ratio = this.ratio;
+        this.pack.style.display = "inline-block";
+        this.pack.style.zIndex = `${this.z}`;
+        this.pack.style.left   = `${this.left}px`;
+        this.pack.style.top    = `${this.top}px`;
+        this.pack.style.width  = `${this.width}px`;
+        this.pack.style.height = `${this.height}px`;
+        this.pack.style.borderWidth = `${this.borderWidth}px`;
+        this.frame = this.decorate(this.frame);
+
+        if(this.visible === false){
+            this.pack.style.display = "none";
+        }
+        return this.pack;
+    }
+
+    resize(ratio){
+        if(this.resizable === false){return;}
+        this.ratio = ratio;
+    }
+
+    decorate(frame){
+        for(const prop in this.style){
+            frame.style[prop] = this.style[prop];
+        }
+        return frame;
+    }
+
+    show(){
+        this.visible = true;
+        return this.draw();
+    }
+
+    hide(){
+        this.visible = false;
+        return this.draw();
+    }
+
+    editable(){
+        this.dom.setAttribute("contenteditable",true);
+        return this.draw();
+    }
+
+    uneditable(){
+        this.dom.setAttribute("contenteditable",false);
+        return this.draw();
+    }
+
+    get left(){
+        return this.x * this.ratio.w;
+    }
+
+    get top(){
+        return this.y * this.ratio.h;
+    }
+
+    get right(){
+        return (this.x + this.w) * this.ratio.w;
+    }
+
+    get bottom(){
+        return (this.y + this.h) * this.ratio.h; 
+    }
+
+    get width(){
+        return this.w * this.ratio.w;
+    }
+
+    get height(){
+        return this.h * this.ratio.h;
+    }
+
+    get message(){
+        return this.messages.innerHTML;
+    }
+
+    set message(html){
+        if(typeof(html) === "string"){
+            this.messages.innerHTML = html;
+        }else{
+            this.messages.appendChild(html);
+        }
+    }
+
+    get name(){
+        return this.title.innerHTML
+    }
+
+    set name(html){
+        if(typeof(html) === "string"){
+            this.title.innerHTML = html;
+        }else{
+            this.title.appendChild(html);
+        }
+    }
+
+    get contextmenu(){
+        return this._contextmenu;
+    }
+
+    set contextmenu(func){
+        if(typeof(func) === "function"){
+            this._contextmenu = func;
+        }
+    }
+
+    get dblclick(){
+        return this._dblclick;
+    }
+
+    set dblclick(func){
+        if(typeof(func) === "function"){
+            this._dblclick = func;
+        }
+    }
+
+    get keydown(){
+        return this._keydown;
+    }
+
+    set keydown(func){
+        if(typeof(func) === "function"){
+            this._keydown = func;
+        }
+    }
+
+    get resize_event(){
+        return this._resize === null ? function(){return} : this._resize;
+    }
+
+    set resize_event(func){
+        if(typeof(func) === "function"){
+            this._resize = func;
+        }
+    }
 }
 
 /**
@@ -363,7 +893,7 @@ class Sticky{
         this.focused = null;
         this.mouseX = 0;
         this.mouseY = 0;
-        // TODO
+        // TODO touch
         document.body.addEventListener("mousedown",function(e){
             Sticky.mouseX = e.pageX;
             Sticky.mouseY = e.pageY;
@@ -387,7 +917,7 @@ class Sticky{
         canvas.style.left = "0px";
         canvas.style.top  = "0px";
         canvas.style.pointerEvents = "none";
-        // TODO
+        // TODO touch
         window.addEventListener("resize",function(){
             canvas.width = Sticky.canvas.offsetWidth;
             canvas.height = Sticky.canvas.offsetHeight;
@@ -481,6 +1011,7 @@ class Sticky{
         this._resize = null;
 
         Sticky.list.push(this);
+        console.log(Sticky.list);
     }
 
     get borderWidth(){
@@ -517,7 +1048,7 @@ class Sticky{
         this.h = h;
     }
 
-    make(html=""){
+    make(html="",editable=true){
         // 仮想DOMから生成
         this.dom = document.createElement("div");
         if (typeof(html) === "string"){
@@ -525,12 +1056,13 @@ class Sticky{
         }else{
             this.dom.appendChild(html);
         }
-        this.pickable(this.dom);
+        this.pickable(this.dom,editable);
         this.dom.dataset.x = this.x;
         this.dom.dataset.y = this.y;
         this.dom.dataset.z = this.z;
         this.dom.dataset.h = this.h;
         this.dom.dataset.w = this.w;
+        return this;
     }
 
     wrap(selector, editable=true){
@@ -554,6 +1086,7 @@ class Sticky{
         this.w = w === undefined ? this.w : w;
         this.h = h === undefined ? this.h : h;
         this.pickable(this.dom, editable);
+        return this;
     }
 
     relative(sticky){

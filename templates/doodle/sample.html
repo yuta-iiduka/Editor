@@ -1,0 +1,12 @@
+{% extends "_side.html" %}
+{% block title %}Sample{% endblock %}
+{% block content %}
+    <div id="frame" style="height: 100vh; width:100vw; overflow: hidden; position:relative">
+        <div id="sample" class="sample" style="width:6400px; height: 4800px;"></div>
+    </div>
+{% endblock %}
+
+{% block script %}
+    <script src="{{url_for('static',filename='js/_/canvas.js')}}"></script>
+    <script src="{{url_for('static',filename='js/doodle/sample.js')}}"></script>
+{% endblock %}
