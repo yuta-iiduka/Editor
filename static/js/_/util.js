@@ -204,6 +204,30 @@ class Grid{
         this.dom.style.fontSize = `${size}px`;
     }
 
+    get map(){
+        const lst = [];
+        for(let r=0; r<this.y; r++){
+            lst[r] = [];
+            for(let c=0; c<this.x; c++){
+                lst[r][c]=[];
+            }
+        }
+        for(let o of this.objects){
+            let x = Math.round(o.x/this.w);
+            let y = Math.round(o.y/this.h);
+            let w = Math.round(o.w/this.w);
+            let h = Math.round(o.h/this.h);
+            lst[y][x].push(o);
+            for(let r=1; r<h; r++){
+                lst[y+r][x].push(o);
+            }
+            for(let c=1; c<w; c++){
+                lst[y][x+c].push(o);
+            }
+        }
+        return lst;
+    }
+
     make(selector){
         const self = this;
         const dom = document.querySelector(selector);
@@ -337,7 +361,6 @@ class GridWide extends Grid{
         this._y = y;
         this._w = w;
         this._h = h;
-        // this.dom.style.overflow = "auto";
     }
 
     append(id,obj){
@@ -641,6 +664,10 @@ class Block{
 
         // 中処理
         document.body.addEventListener("mousemove",function(e){
+            const offset = self.pack.parentElement.getClientRects()[0];
+            const offsetL = offset.left;
+            const offsetT = offset.top;
+
             // カーソル変更
             if(is_frame === false && is_pack === true){
                 const rect = self.frame.getClientRects()[0];
@@ -666,7 +693,7 @@ class Block{
                 window.getSelection().removeAllRanges();
             }else if(hold === "left"){
                 self.move(
-                    (e.pageX - Block.mouseX + baseL) / self.ratio.w,
+                    (e.pageX - offsetL - Block.mouseX + baseL) / self.ratio.w,
                     self.y
                 )
                 self.size(
@@ -679,7 +706,7 @@ class Block{
             }else if(hold === "top"){
                 self.move(
                     self.x,
-                    (e.pageY - Block.mouseY + baseT) / self.ratio.h,
+                    (e.pageY - offsetT - Block.mouseY + baseT) / self.ratio.h,
                 )
                 self.size(
                     self.w,
@@ -701,9 +728,7 @@ class Block{
 
             // 位置変更
             if(self.movable){
-                const offset = self.pack.parentElement.getClientRects()[0];
-                const offsetL = offset.left;
-                const offsetT = offset.top;
+                
                 self.move(
                     (e.pageX - offsetL - (Block.mouseX - baseL)) / self.ratio.w,
                     (e.pageY - offsetT  - (Block.mouseY - baseT)) / self.ratio.h
