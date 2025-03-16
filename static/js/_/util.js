@@ -204,6 +204,20 @@ class Grid{
         this.dom.style.fontSize = `${size}px`;
     }
 
+    get position(){
+        /**
+         * fixed or absolute
+         */
+        return this.dom.style.position
+    }
+
+    set position(posi){
+        /**
+         * fixed or absolute
+         */
+        this.dom.style.position = posi;
+    }
+
     get map(){
         const lst = [];
         for(let r=0; r<this.y; r++){
@@ -257,6 +271,16 @@ class Grid{
             o.draw();
         }
     
+    }
+
+    globalize(){
+        this.position = "fixed";
+        this.draw();
+    }
+
+    localize(){
+        this.position = "absolute";
+        this.draw();
     }
 
     fit(o){
@@ -349,10 +373,9 @@ class Grid{
         // グリッドの再描画
         this.draw();
     }
-
 }
 
-class GridWide extends Grid{
+class GridFix extends Grid{
     static defaultW = Grid.width / 32;
     static defaultH = Grid.height / 32;
     constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body"){
@@ -375,19 +398,31 @@ class GridWide extends Grid{
     get h(){
         return this._h;
     }
-
 }
 
-class GridLocal extends GridWide{
+class GridGlobal extends GridFix{
     constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body"){
         super(x,y,w,h,selector);
         this._x = x;
         this._y = y;
         this._w = w;
         this._h = h;
-        this.dom.style.position = "absolute";
+        this.globalize();
+        this.dom.parentElement.style.position = "relative";
     }
+}
 
+class GridFixLocal extends GridFix{
+    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body"){
+        super(x,y,w,h,selector);
+        this._x = x;
+        this._y = y;
+        this._w = w;
+        this._h = h;
+        this.localize();
+        this.dom.parentElement.style.position = "relative";
+        this.dom.parentElement.style.overflow = "auto";
+    }
 }
 
 class Block{
@@ -665,8 +700,15 @@ class Block{
         // 中処理
         document.body.addEventListener("mousemove",function(e){
             const offset = self.pack.parentElement.getClientRects()[0];
-            const offsetL = offset.left;
-            const offsetT = offset.top;
+            
+            // glovalかlocalで調整
+            let offsetL = offset.left;
+            let offsetT = offset.top;
+
+            if (self.position === "fixed"){
+                offsetL = 0;
+                offsetT = 0;
+            }
 
             // カーソル変更
             if(is_frame === false && is_pack === true){
@@ -867,8 +909,24 @@ class Block{
         }
     }
 
+    get position(){
+        return this.pack.style.position;
+    }
+
+    set position(posi){
+        return this.pack.style.position = posi;
+    }
+
     get contextmenu(){
         return this._contextmenu;
+    }
+
+    glovalize(){
+        this.position = "fixed";
+    }
+
+    localize(){
+        this.position = "absolute";
     }
 
     set contextmenu(func){

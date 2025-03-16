@@ -7,7 +7,7 @@ d1.append(co);
 
 
 // const g = new Grid(64,32);
-const g = new GridWide(32,16,24,24);
+const g = new GridFix(32,16,24,24);
 const o = new Sticky();
 const go = new Sticky();
 go.make("HELLO");
