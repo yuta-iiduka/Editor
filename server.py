@@ -7,7 +7,6 @@ from flask_socketio import SocketIO, emit, send,join_room,leave_room,close_room,
 from flask_migrate import Migrate
 from flask_login import login_required
 
-
 # モデルのインポート
 from db.db import db
 from logger import logger, log
@@ -19,6 +18,10 @@ from _user import user
 from _debugger import debugger
 from _blog import blog
 
+# ファイルロード
+from common.file import JsonData
+
+const = JsonData("etc/const.json").data
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "xxxxxxxx"
@@ -56,5 +59,12 @@ def home():
 def menu():
     return render_template("menu.html")
 
+@app.context_processor
+def inject_const():
+    return const
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5555)
+    # app.run(host="0.0.0.0", port=5555)
+    print(const)
+    app.run(host=const["app_host"], port=const["app_port"])
+    
