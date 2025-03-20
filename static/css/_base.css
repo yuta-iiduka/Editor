@@ -112,7 +112,6 @@ iframe{
 }
 
 .content .side .sidebar-btn{
-    display: flex;
     cursor: pointer;
     height:24px;
 	width:100%;

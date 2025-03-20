@@ -79,9 +79,13 @@ class DOM {
     }
 
     constructor(selector){
-        this.parent = document.querySelector(selector);
+        if (typeof(selector) === "string" ){
+            this.parent = document.querySelector(selector);
+        }else{
+            this.parent = selector;
+        }
         this.frame = null;
-        // this.id = this.append();
+        this.contents = null;
     }
 
     type(){
@@ -127,10 +131,14 @@ class DOM {
      * @returns 
      */
     build(){
-        this.frame = DOM.create("div",{class:`fram-${this.type()}`})
+        this.frame = DOM.create("div",{class:`frame-${this.type()}`})
         this.frame.appendChild(this.make());
         this.parent.appendChild(this.frame);
         return this.frame;
+    }
+
+    get cssClassFrame(){
+        return `frame-${this.type()}`;
     }
 }
 
@@ -400,7 +408,7 @@ class GridFix extends Grid{
     }
 }
 
-class GridGlobal extends GridFix{
+class GridFixGlobal extends GridFix{
     constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body"){
         super(x,y,w,h,selector);
         this._x = x;
@@ -1854,6 +1862,159 @@ class Pagination{
     }
 }
 
+class SideMenu extends DOM {
+
+    static list = [];
+    static MODE = {LEFT:"left",RIGHT:"right"};
+    static CONST = {TO_RIGHT:"&#9655",TO_LEFT:"&#9665"};
+
+    constructor(selector="body",mode=SideMenu.MODE.LEFT){
+        super(selector);
+        this.mode = mode;
+        this.css = this.style();
+        this.btn_op = null;
+        this.btn_cl = null;
+        
+        SideMenu.list.push(this);
+    }
+
+    style(){
+        return SideMenu.list.length > 0 ? null : new Style(`
+            .${this.cssClassFrame}{
+                height: 100%;
+                width: 100%;
+                position: absolute;
+                left: 0px;
+                top: 0px;
+                pointer-events:none;
+            }
+
+            .sidemenu-contents{
+                display:flex;
+                width: 50%;
+                height: 100%;
+                width: 16px;
+                text-wrap: nowrap;
+                over-flow: hidden;
+                transition: width 0.5s, left 0.5s;
+                position: absolute;
+                left: 0px;
+                pointer-events: all;
+
+            }
+
+            .sidemenu-contents.left{
+                flex-direction:row-reverse;
+            }
+            .sidemenu-contents.right{
+                flex-direction:row;
+                left:calc(100% - 16px)
+            }
+
+            .sidemenu-contents.active{
+                width: calc(50% + 16px);
+            }
+
+            .sidemenu-contents.right.active{
+                left: calc(50% - 16px);
+            }
+
+            .btnbar{
+                background-color: #333333;
+                width: 16px;
+                height: 100%;
+                display:flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .btnop{
+                background-color: #333333;
+                cursor: pointer;
+                height: 16px;
+                width: 16px;
+                display:flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .btnop.disable{
+                display:none;
+            }
+
+            .btncl{
+                background-color: #333333;
+                cursor: pointer;
+                height: 16px;
+                width: 16px;
+                display:flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .btncl.disable{
+                display:none;
+            }
+
+            .contents{
+                display:flex;
+                flex-direction:column;
+                background-color: #222222;
+                height: 100%;
+                width: calc(100% - 16px);
+                overflow-x: hidden;
+                
+            }
+        `);
+    }
+
+
+    make(){
+        const elm = super.make();
+        elm.classList.add("sidemenu-contents");
+        elm.classList.add(this.mode);
+        const op = this.mode === SideMenu.MODE.LEFT ? SideMenu.CONST.TO_RIGHT : SideMenu.CONST.TO_LEFT;
+        const cl = this.mode === SideMenu.MODE.LEFT ? SideMenu.CONST.TO_LEFT  : SideMenu.CONST.TO_RIGHT;
+        const btnbar = DOM.create("div",{class:"btnbar"});
+        this.btn_op = DOM.create("div",{class:"btnop"});
+        this.btn_op.innerHTML = op;
+        this.btn_cl = DOM.create("div",{class:"btncl"});
+        this.btn_cl.classList.add("disable");
+        this.btn_cl.innerHTML = cl;
+        btnbar.appendChild(this.btn_op);
+        btnbar.appendChild(this.btn_cl);
+        this.contents = DOM.create("div",{class:"contents"});
+        elm.appendChild(btnbar);
+        elm.appendChild(this.contents);
+
+        const self = this;
+        const disable = "disable";
+        this.btn_op.addEventListener("click",function(){
+            self.btn_op.classList.add(disable);
+            self.btn_cl.classList.remove(disable);
+            elm.classList.add("active");
+        });
+        this.btn_cl.addEventListener("click",function(){
+            self.btn_op.classList.remove(disable);
+            self.btn_cl.classList.add(disable);
+            elm.classList.remove("active");
+        });
+
+        return elm
+    }
+
+    build(dom){
+        super.build();
+        if(this.css !== null && this.css !== undefined){
+            this.css.build();
+        }
+        if(dom !== null && dom !== undefined){
+            this.contents.appendChild(dom);
+        }
+        return this.frame;
+    }
+
+}
 
 // let f = new Filter();
 //     f.set_condition(
