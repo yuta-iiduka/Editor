@@ -179,6 +179,10 @@ class Grid{
         this.fontSize = this.baseFontSize;
         this.fontResize = true;
         this._objects = {};
+        this.lineColor = "#444444";
+        this.lineSubColor = "#aaaaaa";
+        this._width  = this.dom.offsetWidth;
+        this._height = this.dom.offsetHeight;
 
         this.draw();
 
@@ -202,6 +206,20 @@ class Grid{
 
     get h(){
         return this.y > 0 ? (Grid.height / this.y) * Grid.windowRatio.h : 0;
+    }
+
+    get width(){
+        /**
+         * Grid全体の横幅
+         */
+        return this.dom.offsetWidth;
+    }
+
+    get height(){
+        /**
+         * Grid全体の立幅
+         */
+        return this.dom.offsetHeight;
     }
 
     get fontSize(){
@@ -235,19 +253,28 @@ class Grid{
             }
         }
         for(let o of this.objects){
-            let x = Math.round(o.x/this.w);
-            let y = Math.round(o.y/this.h);
-            let w = Math.round(o.w/this.w);
-            let h = Math.round(o.h/this.h);
-            lst[y][x].push(o);
-            for(let r=1; r<h; r++){
-                lst[y+r][x].push(o);
-            }
-            for(let c=1; c<w; c++){
-                lst[y][x+c].push(o);
+            const wid = o.resizable === true ? this.w / Grid.windowRatio.w : this.w;
+            const hit = o.resizable === true ? this.h / Grid.windowRatio.h : this.h;
+            let x = Math.round(o.x/wid);
+            let y = Math.round(o.y/hit);
+            let w = Math.round(o.w/wid);
+            let h = Math.round(o.h/hit);
+            // lst[y][x].push(o);
+            for(let r=0; r<h; r++){
+                // lst[y+r][x].push(o);
+                for(let c=0; c<w; c++){
+                    lst[y+r][x+c].push(o);
+                }
             }
         }
         return lst;
+    }
+
+    cell(r,c){
+        let result = null;
+        if( r<this.map.length){
+            result = this.map[r][c];
+        }
     }
 
     make(selector){
@@ -269,8 +296,9 @@ class Grid{
         const h = this.h;
         dom.style.backgroundSize = `${w}px ${h}px`;
         dom.style.backgroundPosition = `0% 0%`;
-        dom.style.backgroundImage = `repeating-linear-gradient(90deg,#aaa,#aaa 1px,transparent 1px,transparent ${w}px),repeating-linear-gradient(0deg,#aaa,#aaa 1px,transparent 1px,transparent ${h}px)`;
-    
+        // dom.style.backgroundImage = `repeating-linear-gradient(90deg,#aaa 0px,#aaa 1px,transparent 1px,transparent ${w}px,red ${w}px,red ${w+1}px,transparent ${w+1}px, transparent ${w*2}px),repeating-linear-gradient(0deg,#aaa,#aaa 1px,transparent 1px,transparent ${h}px)`;
+        dom.style.background = `repeating-linear-gradient(90deg,${this.lineColor} 0px,${this.lineColor} 1px,transparent 1px,transparent ${w}px,${this.lineColor} ${w}px,${this.lineColor} ${w+1}px,transparent ${w+1}px,transparent ${w*2}px,${this.lineColor} ${w*2}px,${this.lineColor} ${w*2+1}px,transparent ${w*2+1}px,transparent ${w*3}px,${this.lineColor} ${w*3}px,${this.lineColor} ${w*3+1}px,transparent ${w*3+1}px,transparent ${w*4}px,${this.lineColor} ${w*4}px,${this.lineColor} ${w*4+1}px,transparent ${w*4+1}px,transparent ${w*5}px,${this.lineSubColor} ${w*5}px,${this.lineSubColor} ${w*5+1}px,transparent ${w*5+1}px,transparent ${w*6}px),repeating-linear-gradient(0deg,${this.lineColor},${this.lineColor} 1px,transparent 1px,transparent ${h}px)`;
+        
         // オブジェクトの描画
         for(let o of this.objects){
             // 座標の調整
@@ -292,6 +320,7 @@ class Grid{
     }
 
     fit(o){
+        if(o.filtable === false){return;}
         const w = o.resizable === true ? this.w / Grid.windowRatio.w : this.w;
         const h = o.resizable === true ? this.h / Grid.windowRatio.h : this.h;
         if(o.x % w > w / 2){
@@ -309,7 +338,7 @@ class Grid{
         if(o.w % w > w / 2){
             o.w = (Math.floor(o.w / w) + 1) * w;
             if( 2 * o.borderWidth < w / 2){
-                o.w -= o.borderWidth ;
+                o.w -= o.borderWidth;
             }
         }else{
             o.w = Math.floor(o.w /w) * w;
@@ -329,6 +358,27 @@ class Grid{
                 o.h -= o.borderWidth;
             }
         }
+
+        // はみ出した場合の処理
+        if(o.x < 0){
+            o.x = 0;
+        }
+
+        if(o.x + o.width > this.width){
+            console.log(o.x , w, this.width);
+            o.x = this.width - o.width;
+        }
+
+        if(o.y < 0){
+            o.y = 0;
+        }
+
+        if(o.y + o.height > this.height){
+            console.log(o.y , h, this.height);
+            o.y = this.height - o.height;
+        }
+
+        o.p = {x:Math.round(o.x/w),y:Math.round(o.y/h),z:o.z,w:Math.round(o.w/w),h:Math.round(o.h/h)}
     }
 
     check(obj){
@@ -451,11 +501,13 @@ class Block{
     }
 
     static focus(){
-        for(let s of Block.list){
-            if(s.focused === true){
-                s.z = Block.MAX_ZINDEX;
+        for(let b of Block.list){
+            if(b.focused === true){
+                b.z = Block.MAX_ZINDEX;
+                b.dom.style.borderColor = "yellow";
             }else{
-                s.z = Block.MIN_ZINDEX;
+                b.z = Block.MIN_ZINDEX;
+                b.dom.style.borderColor = b.dom.style.backgroundColor;
             }
         }
     }
@@ -469,6 +521,7 @@ class Block{
         this.w = w;
         this.h = h;
         this.ratio = {w:1,h:1};
+        this._p = {x:this.x,y:this.y,z:this.z,w:this.w,h:this.h};
         
         // DOM情報
         this.dom = null;
@@ -491,6 +544,7 @@ class Block{
         this.movable = false;
         this.resizable = true;
         this.visible = true;
+        this.fitable = true;
 
         this._contextmenu = function(e){console.log(`${this.id}:contextmenu`)};
         this._dblclick = function(e){console.log(`${this.id}:dblclick`)};
@@ -498,7 +552,6 @@ class Block{
         this._resize = null;
 
         Block.list.push(this);
-        console.log(Block.list);
     }
 
     get borderWidth(){
@@ -523,6 +576,19 @@ class Block{
 
     get name(){
         return this.constructor.name.toLowerCase();
+    }
+
+    get p(){
+        return this._p;
+    }
+
+    set p(positionset){
+        this._p = positionset;
+        this.dom.dataset.x = positionset.x;
+        this.dom.dataset.y = positionset.y;
+        this.dom.dataset.z = positionset.z;
+        this.dom.dataset.w = positionset.w;
+        this.dom.dataset.h = positionset.h;        
     }
 
     move(x,y){
@@ -589,8 +655,9 @@ class Block{
     pickable(dom=document.createElement("div"),editable=true){
         const self = this;
         dom.setAttribute("contenteditable",editable);
-        dom.style.height = "100%";
-        dom.style.width = "100%";
+        dom.style.height = "calc(100% - 2px)";
+        dom.style.width = "calc(100% - 2px )";
+        dom.style.border = `1px solid ${this.borderColor}`;
         const pack = document.createElement("div");
         pack.style.position = "absolute";
         pack.style.overflow = "hidden";
@@ -1926,6 +1993,7 @@ class SideMenu extends DOM {
                 display:flex;
                 justify-content: center;
                 align-items: center;
+                cursor: pointer;
             }
 
             .btnop{
@@ -1989,16 +2057,32 @@ class SideMenu extends DOM {
 
         const self = this;
         const disable = "disable";
-        this.btn_op.addEventListener("click",function(){
-            self.btn_op.classList.add(disable);
-            self.btn_cl.classList.remove(disable);
-            elm.classList.add("active");
-        });
-        this.btn_cl.addEventListener("click",function(){
-            self.btn_op.classList.remove(disable);
-            self.btn_cl.classList.add(disable);
-            elm.classList.remove("active");
-        });
+        let mode = "close";
+        // this.btn_op.addEventListener("click",function(){
+        //     self.btn_op.classList.add(disable);
+        //     self.btn_cl.classList.remove(disable);
+        //     elm.classList.add("active");
+        //     mode = "open";
+        // });
+        // this.btn_cl.addEventListener("click",function(){
+        //     self.btn_op.classList.remove(disable);
+        //     self.btn_cl.classList.add(disable);
+        //     elm.classList.remove("active");
+        //     mode = "close";
+        // });
+        btnbar.addEventListener("click",function(){
+            if(mode === "close"){
+                self.btn_op.classList.add(disable);
+                self.btn_cl.classList.remove(disable);
+                elm.classList.add("active");
+                mode = "open";
+            }else{
+                self.btn_op.classList.remove(disable);
+                self.btn_cl.classList.add(disable);
+                elm.classList.remove("active");
+                mode = "close";
+            }
+        })
 
         return elm
     }
@@ -2012,6 +2096,93 @@ class SideMenu extends DOM {
             this.contents.appendChild(dom);
         }
         return this.frame;
+    }
+}
+
+class Scheduler{
+    static cnt = 0;
+    static list = [];
+
+    constructor(selector="body"){
+        this.dom = document.querySelector(selector);
+        this.grid = new GridFixLocal(1440,64,8,64,selector);
+        this.data = [];
+        this.page = [];
+        this.active_page = 0;
+
+        Scheduler.list.push(this);
+    }
+
+    get map(){
+        const m = this.grid.map;
+        const n = [];
+        for(let r=0; r<m.length; r++){
+            n[r] = [];
+            for(let c=0; c<m[r].length; c++){
+                n[r][c] = [];
+                for(let o=0; o<m[r][c].length; o++){
+                    if(m[r][c][o].visible === true){
+                        n[r][c].push(m[r][c][o]);
+                    }
+                }
+            }
+        }
+        return n;
+    }
+
+    make(html){
+        const b = new Block(1,1,1,10,1).make(html);
+        this.grid.append(b.id,b);
+        this.data.push(b);
+        return this
+    }
+
+    wrap(selector){
+        const b = new Block(1,1,1,10,1).wrap(selector);
+        this.grid.append(b.id,b);
+        this.data.push(b);
+        return this
+    }
+
+    filterable(){
+        this.filter_obj = new Filter();
+        return this;
+    }
+
+    sortable(){
+        this.sort_obj = new Sort();
+        return this;
+    }
+
+    pagenatable(condition={perPage:2,dataLength:this.data.length}){
+        const p = new Pagination(condition,this.data);
+        p.build();
+        this.page = p.result;
+        return this;
+    }
+
+    turn_page(index=0){
+        this.active_page = index;
+        this.draw();
+    }
+
+    draw(){
+        for(let i=0; i<this.page.length; i++){
+            for(let o of this.page[i]){
+                if(i === this.active_page){
+                    o.visible = true;
+                }else{
+                    o.visible = false;
+                }
+            }
+        }
+        this.grid.draw();
+    }
+
+    build(){
+        this.pagenatable();
+        this.draw();
+        return this;
     }
 
 }
