@@ -297,7 +297,7 @@ class Grid{
         dom.style.backgroundSize = `${w}px ${h}px`;
         dom.style.backgroundPosition = `0% 0%`;
         // dom.style.backgroundImage = `repeating-linear-gradient(90deg,#aaa 0px,#aaa 1px,transparent 1px,transparent ${w}px,red ${w}px,red ${w+1}px,transparent ${w+1}px, transparent ${w*2}px),repeating-linear-gradient(0deg,#aaa,#aaa 1px,transparent 1px,transparent ${h}px)`;
-        dom.style.background = `repeating-linear-gradient(90deg,${this.lineColor} 0px,${this.lineColor} 1px,transparent 1px,transparent ${w}px,${this.lineColor} ${w}px,${this.lineColor} ${w+1}px,transparent ${w+1}px,transparent ${w*2}px,${this.lineColor} ${w*2}px,${this.lineColor} ${w*2+1}px,transparent ${w*2+1}px,transparent ${w*3}px,${this.lineColor} ${w*3}px,${this.lineColor} ${w*3+1}px,transparent ${w*3+1}px,transparent ${w*4}px,${this.lineColor} ${w*4}px,${this.lineColor} ${w*4+1}px,transparent ${w*4+1}px,transparent ${w*5}px,${this.lineSubColor} ${w*5}px,${this.lineSubColor} ${w*5+1}px,transparent ${w*5+1}px,transparent ${w*6}px),repeating-linear-gradient(0deg,${this.lineColor},${this.lineColor} 1px,transparent 1px,transparent ${h}px)`;
+        dom.style.background = `repeating-linear-gradient(90deg,${this.lineSubColor} 0px,${this.lineColor} 1px,transparent 1px,transparent ${w}px,${this.lineColor} ${w}px,${this.lineColor} ${w+1}px,transparent ${w+1}px,transparent ${w*2}px,${this.lineColor} ${w*2}px,${this.lineColor} ${w*2+1}px,transparent ${w*2+1}px,transparent ${w*3}px,${this.lineColor} ${w*3}px,${this.lineColor} ${w*3+1}px,transparent ${w*3+1}px,transparent ${w*4}px,${this.lineColor} ${w*4}px,${this.lineColor} ${w*4+1}px,transparent ${w*4+1}px,transparent ${w*5}px),repeating-linear-gradient(0deg,${this.lineColor},${this.lineColor} 1px,transparent 1px,transparent ${h}px)`;
         
         // オブジェクトの描画
         for(let o of this.objects){
@@ -379,6 +379,9 @@ class Grid{
         }
 
         o.p = {x:Math.round(o.x/w),y:Math.round(o.y/h),z:o.z,w:Math.round(o.w/w),h:Math.round(o.h/h)}
+        if(typeof(o.fit) === "function"){
+            o.fit(o.p);
+        }
     }
 
     check(obj){
@@ -407,6 +410,26 @@ class Grid{
             console.warn(msg);
         }
         return this._objects;
+    }
+
+    move(o,x=1,y=1){
+        const w = o.resizable === true ? this.w / Grid.windowRatio.w : this.w;
+        const h = o.resizable === true ? this.h / Grid.windowRatio.h : this.h;
+        o.move(
+            o.x + (w * x),
+            o.y + (h * y)
+        )
+        this.draw();
+    }
+
+    size(o,x=1,y=1){
+        const w = o.resizable === true ? this.w / Grid.windowRatio.w : this.w;
+        const h = o.resizable === true ? this.h / Grid.windowRatio.h : this.h;
+        o.size(
+            o.w + (w * x),
+            o.h + (h * y)
+        )
+        this.draw();
     }
 
     remove(id){
@@ -504,10 +527,12 @@ class Block{
         for(let b of Block.list){
             if(b.focused === true){
                 b.z = Block.MAX_ZINDEX;
-                b.dom.style.borderColor = "yellow";
+                // b.dom.style.borderColor = "yellow";
+                b.pack.style.borderColor = b.storongBorderColor;
             }else{
                 b.z = Block.MIN_ZINDEX;
-                b.dom.style.borderColor = b.dom.style.backgroundColor;
+                // b.dom.style.borderColor = b.dom.style.backgroundColor;
+                b.pack.style.borderColor = b.baseBorderColor;
             }
         }
     }
@@ -546,9 +571,16 @@ class Block{
         this.visible = true;
         this.fitable = true;
 
+        this.vertical = true;
+        this.horizontal = true;
+
+        this.baseBorderColor = "";
+        this.storongBorderColor = "yellow";
+
         this._contextmenu = function(e){console.log(`${this.id}:contextmenu`)};
         this._dblclick = function(e){console.log(`${this.id}:dblclick`)};
         this._keydown = function(e){console.log(`${this.id}:keydown ${e.key}`)};
+        this._fit = function(p){console.log(`${this.id}:fit[${p.x},${p.y}]`)};;
         this._resize = null;
 
         Block.list.push(this);
@@ -592,13 +624,13 @@ class Block{
     }
 
     move(x,y){
-        this.x = x;
-        this.y = y;
+        if(this.horizontal === true){this.x = x};
+        if(this.vertical   === true){this.y = y};
     }
 
     size(w,h){
-        this.w = w;
-        this.h = h;
+        if(this.horizontal === true){this.w = w};
+        if(this.vertical   === true){this.h = h};
     }
 
     make(html="", editable=false){
@@ -1027,6 +1059,16 @@ class Block{
     set keydown(func){
         if(typeof(func) === "function"){
             this._keydown = func;
+        }
+    }
+
+    get fit(){
+        return this._fit;
+    }
+
+    set fit(func){
+        if(typeof(func) === "function"){
+            this._fit = func;
         }
     }
 
@@ -2185,6 +2227,26 @@ class Scheduler{
         return this;
     }
 
+}
+
+class DateTime{
+
+    /**
+     * 時間区間の重なりをチェックする関数
+     * @param {Date | number} start1 - 最初の区間の開始時刻（Dateオブジェクトまたはタイムスタンプ）
+     * @param {Date | number} end1   - 最初の区間の終了時刻
+     * @param {Date | number} start2 - 比較する区間の開始時刻
+     * @param {Date | number} end2   - 比較する区間の終了時刻
+     * @returns {boolean} - 区間が重なっている場合は true
+     */
+    static isOverlapping(start1, end1, start2, end2) {
+        start1 = typeof(start1) === "string" ? new Date(start1) : start1 
+        start2 = typeof(start2) === "string" ? new Date(start2) : start2 
+        end1 = typeof(end1) === "string" ? new Date(end1) : end1 
+        end2 = typeof(end2) === "string" ? new Date(end2) : end2 
+
+        return (start1 < end2 && start2 < end1);
+    }
 }
 
 // let f = new Filter();

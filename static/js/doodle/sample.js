@@ -16,4 +16,3 @@ scheduler.build()
 
 sm = new SideMenu("body",SideMenu.MODE.RIGHT); //b.dom,SideMenu.MODE.RIGHT
 sm.build(document.createTextNode("xxx"));
-
