@@ -159,3 +159,9 @@ iframe{
     align-items: center;
     background-color: #111111;
 }
+
+/* .frame{
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+} */

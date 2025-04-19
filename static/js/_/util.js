@@ -132,7 +132,8 @@ class DOM {
      */
     build(){
         this.frame = DOM.create("div",{class:`frame-${this.type()}`})
-        this.frame.appendChild(this.make());
+        this.contents = this.make();
+        this.frame.appendChild(this.contents);
         this.parent.appendChild(this.frame);
         return this.frame;
     }
@@ -510,7 +511,7 @@ class Block{
     static{
         this.cnt = 0;
         this.list = [];
-        this.focused = null;
+        // this.focused = null;
         this.mouseX = 0;
         this.mouseY = 0;
         // TODO touch
@@ -524,6 +525,7 @@ class Block{
     }
 
     static focus(){
+        window.getSelection().removeAllRanges();
         for(let b of Block.list){
             if(b.focused === true){
                 b.z = Block.MAX_ZINDEX;
@@ -537,6 +539,40 @@ class Block{
         }
     }
 
+    static get focused(){
+        return Block.list.filter((b)=>b.focused===true);
+    }
+
+    static syncronize_move(blk){
+        for(let b of Block.focused){
+            if(b !== blk){
+                b.move(b.x + blk.gap.x, b.y + blk.gap.y);
+                b.draw();
+            }
+        }
+    }
+
+    static syncronize_size(blk){
+        for(let b of Block.focused){
+            if(b !== blk){
+                b.size(b.w + blk.gap.w, b.h + blk.gap.h);
+                b.draw();
+            }
+        }
+    }
+
+    static isOverlapping(b1, b2) {
+        const rect1 = b1.dom.getBoundingClientRect();
+        const rect2 = b2.dom.getBoundingClientRect();
+      
+        return !(
+          rect1.right - 1 < rect2.left ||   // rect1がrect2の左にある
+          rect1.left + 1 > rect2.right ||   // rect1がrect2の右にある
+          rect1.bottom + 1 < rect2.top ||   // rect1がrect2の上にある
+          rect1.top - 1 > rect2.bottom      // rect1がrect2の下にある
+        );
+    }
+
     constructor(x=10,y=10,z=1,w=5,h=5){
         this.id = Block.cnt++;
         // 座標情報
@@ -547,6 +583,7 @@ class Block{
         this.h = h;
         this.ratio = {w:1,h:1};
         this._p = {x:this.x,y:this.y,z:this.z,w:this.w,h:this.h};
+        this.gap = {x:0,y:0,z:0,w:0,h:0};
         
         // DOM情報
         this.dom = null;
@@ -576,11 +613,25 @@ class Block{
 
         this.baseBorderColor = "";
         this.storongBorderColor = "yellow";
+        this.baseBackgroundColor = this.style.backgroundColor;
+        this.storongBackgroundColor = "red";
 
         this._contextmenu = function(e){console.log(`${this.id}:contextmenu`)};
         this._dblclick = function(e){console.log(`${this.id}:dblclick`)};
         this._keydown = function(e){console.log(`${this.id}:keydown ${e.key}`)};
-        this._fit = function(p){console.log(`${this.id}:fit[${p.x},${p.y}]`)};;
+        this._fit = (p)=>{
+            let lap = false;
+            for(let b of Block.list){
+                if(b.visible === true && b !== this && b.overlap(this)){
+                    this.style.backgroundColor = this.storongBackgroundColor;
+                    lap = true;
+                }
+            }
+            if(lap === false){
+                this.style.backgroundColor = this.baseBackgroundColor;
+            }
+        };
+        this._collide = function(b){console.log(b);}
         this._resize = null;
 
         Block.list.push(this);
@@ -624,11 +675,15 @@ class Block{
     }
 
     move(x,y){
+        this.gap.x = x - this.x;
+        this.gap.y = y - this.y;
         if(this.horizontal === true){this.x = x};
         if(this.vertical   === true){this.y = y};
     }
 
     size(w,h){
+        this.gap.w = w - this.w;
+        this.gap.h = h - this.h;
         if(this.horizontal === true){this.w = w};
         if(this.vertical   === true){this.h = h};
     }
@@ -762,18 +817,20 @@ class Block{
         let baseH = 0;
         this.pack.addEventListener("mouseover",function(e){
             is_pack = true;
-            Block.focused = self;
+            // Block.focused = self;
         });
+
         this.pack.addEventListener("mouseout",function(e){
             is_pack = false;
         });
-        this.pack.addEventListener("mousedown",function(e){
 
-            for(let s of Block.list){
-                s.focused = false;
-            }
+        this.pack.addEventListener("mousedown",function(e){ 
+            if(e.shiftKey === false){
+                for(let b of Block.list){
+                    b.focused = false;
+                }
+            } 
             self.focused = true;
-
             Block.focus();
 
             const base = self.pack.getClientRects()[0];
@@ -840,6 +897,8 @@ class Block{
                 self.resize_event(self.ratio);
                 self.draw();
                 window.getSelection().removeAllRanges();
+                Block.syncronize_size(self);
+
             }else if(hold === "left"){
                 self.move(
                     (e.pageX - offsetL - Block.mouseX + baseL) / self.ratio.w,
@@ -852,6 +911,9 @@ class Block{
                 self.resize_event(self.ratio);
                 self.draw();
                 window.getSelection().removeAllRanges();
+                Block.syncronize_move(self);
+                Block.syncronize_size(self);
+
             }else if(hold === "top"){
                 self.move(
                     self.x,
@@ -864,6 +926,9 @@ class Block{
                 self.resize_event(self.ratio);
                 self.draw();
                 window.getSelection().removeAllRanges();
+                Block.syncronize_move(self);
+                Block.syncronize_size(self);
+
             }else if(hold === "bottom"){
                 self.size(
                     self.w,
@@ -872,18 +937,32 @@ class Block{
                 self.resize_event(self.ratio);
                 self.draw();
                 window.getSelection().removeAllRanges();
+                Block.syncronize_size(self);
+
             }
 
 
             // 位置変更
             if(self.movable){
-                
                 self.move(
                     (e.pageX - offsetL - (Block.mouseX - baseL)) / self.ratio.w,
                     (e.pageY - offsetT  - (Block.mouseY - baseT)) / self.ratio.h
                 );
                 self.draw();
                 window.getSelection().removeAllRanges();
+                Block.syncronize_move(self);
+            }
+
+            // 重なり判定
+            let lap = false;
+            for(let b of Block.list){
+                if(b.visible === true && b !== self && b.overlap(self)){
+                    self.style.backgroundColor = self.storongBackgroundColor;
+                    lap = true;
+                }
+            }
+            if(lap === false){
+                self.style.backgroundColor = self.baseBackgroundColor;
             }
 
         });
@@ -956,6 +1035,17 @@ class Block{
     hide(){
         this.visible = false;
         return this.draw();
+    }
+
+    overlap(b){
+        let result = false;
+        if(this.visible === true && b.visible === true){
+            result = Block.isOverlapping(this,b);
+            if(result){
+                new Promise((resolve)=>{this.collide(b);resolve();});
+            }
+        }
+        return result 
     }
 
     editable(){
@@ -1069,6 +1159,16 @@ class Block{
     set fit(func){
         if(typeof(func) === "function"){
             this._fit = func;
+        }
+    }
+
+    get collide(){
+        return this._collide;
+    }
+
+    set collide(func){
+        if(typeof(func) === "function"){
+            this._collide = func;
         }
     }
 
@@ -2093,9 +2193,9 @@ class SideMenu extends DOM {
         this.btn_cl.innerHTML = cl;
         btnbar.appendChild(this.btn_op);
         btnbar.appendChild(this.btn_cl);
-        this.contents = DOM.create("div",{class:"contents"});
+        this.main = DOM.create("div",{class:"contents"});
         elm.appendChild(btnbar);
-        elm.appendChild(this.contents);
+        elm.appendChild(this.main);
 
         const self = this;
         const disable = "disable";
@@ -2135,9 +2235,110 @@ class SideMenu extends DOM {
             this.css.build();
         }
         if(dom !== null && dom !== undefined){
-            this.contents.appendChild(dom);
+            this.main.appendChild(dom);
         }
         return this.frame;
+    }
+
+    append(dom){
+        this.main.appendChild(dom);
+    }
+
+
+}
+
+class TabPage extends DOM{
+
+    static list = [];
+
+    constructor(selector){
+        super(selector);
+        this.data = {};     //初期データ
+        this.pages = {};    //実際の画面DOMデータ
+        this.css = this.style();
+        TabPage.list.push(this);
+    }
+
+    style(){
+        return new Style(`
+            .tab-btn{
+                background-color: black;
+            }
+            .tab-btn.active{
+                background-color: grey;
+            }
+        `);
+    }
+
+    turn_page(index=0){
+        const pagenames = Object.keys(this.pages);
+        if(typeof(index)==="string"){
+            for(let pagename of pagenames){
+                if(index === pagename){
+                    this.pages[pagename].style.display = "inline-block";
+                }else{
+                    this.pages[pagename].style.display = "none";
+                }
+            }
+        }else{
+            for(let i=0; i<pagenames.length; i++){
+                const pagename = pagenames[i];
+                if(index === i){
+                    this.pages[pagename].style.display = "inline-block";
+                }else{
+                    this.pages[pagename].style.display = "none";
+                }
+            }
+        }
+    }
+
+    make(){
+        const self = this;
+        const elm = super.make();
+        const tab_frame = document.createElement("div");
+        tab_frame.style.height = "24px";
+        tab_frame.style.display = "flex";
+        tab_frame.style.justifyContent = "start";
+        const main_frame = document.createElement("div");
+        main_frame.style.height = "calc(100% - 24px)";
+        elm.appendChild(tab_frame);
+        elm.appendChild(main_frame);
+        elm.style.display = "flex";
+        elm.style.flexDirection = "column";
+        elm.style.height = "100%";
+
+        const pagenames = Object.keys(this.data);
+        let p = 0;
+        for(let pagename of pagenames){
+            const tab_btn = DOM.create("div",{class:"tab-btn"});
+            tab_btn.textContent = pagename;
+            tab_btn.addEventListener("click",function(){
+                self.turn_page(tab_btn.textContent);
+                for(let btn of document.querySelectorAll(".tab-btn")){
+                    btn.classList.remove("active");
+                }
+                tab_btn.classList.add("active");
+            });
+            const tab = document.createElement("div");
+            const content = this.data[pagename];
+            if(typeof(content) === "string"){
+                tab.innerHTML = content;
+            }else{
+                tab.appendChild(content);
+            }
+            tab.style.display = "none";
+            tab.classList.add(`tab${p}`);
+            this.pages[pagename] = tab;
+            tab_frame.appendChild(tab_btn);
+            main_frame.appendChild(tab);
+            p += 1;
+        }
+        return elm;
+    }
+
+    build(){
+        super.build();
+        this.css.build();
     }
 }
 

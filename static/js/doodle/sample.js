@@ -14,5 +14,27 @@ scheduler
 .make("5")
 scheduler.build()
 
-sm = new SideMenu("body",SideMenu.MODE.RIGHT); //b.dom,SideMenu.MODE.RIGHT
+const sm = new SideMenu("body",SideMenu.MODE.RIGHT); //b.dom,SideMenu.MODE.RIGHT
 sm.build(document.createTextNode("xxx"));
+
+const tp = new TabPage(sm.main);
+tp.data["aaa"] = "a";
+tp.data["bbb"] = "b";
+
+tp.build();
+tp.turn_page(0);
+
+
+const modal = new Modal()
+    .set_title("Sample")
+    .set_body("<div id='btn'>modal</div>")
+    .set_yes_btn(function(){
+        console.log("yes");
+    },"OK")
+
+async function confirm_modal(){
+        console.log("confirm start.");
+        await modal.confirm();
+        console.log(modal.result);
+        console.log("confirm end.");
+}

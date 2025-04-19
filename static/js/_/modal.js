@@ -113,15 +113,37 @@ class Modal{
 
         // Modalの起動トリガー群
         this.triggers = [];
+        this.yes_btn = null;
+        this.no_btn = null;
+        this.result = null;
 
         // Modal起動・終了時の処理関数格納用変数
-        this.show_event = null; //function
-        this.hide_event = null; //function
+        this._show_event = null; //function
+        this._hide_event = null; //function
         
         Modal.list.push(this);
         Modal.cnt++;
     }
 
+    get show_event(){
+        return this._show_event;
+    }
+
+    set show_event(func){
+        if(typeof(func)==="function"){
+            this._show_event = func;
+        }
+    }
+
+    get hide_event(){
+        return this._hide_event;
+    }
+
+    set hide_event(func){
+        if(typeof(func)==="function"){
+            this._hide_event = func;
+        }
+    }
 
     create(){
         const self = this;
@@ -224,13 +246,23 @@ class Modal{
     }
 
     show(){
-        if(typeof(this.hide_event) === "function"){this.show_event();}
+        this.result = null;
+        if(typeof(this.show_event) === "function"){this.show_event();}
         this.zIndex = ++Modal.zIndex;
         this.background.style.zIndex = this.zIndex;
         this.frame.style.zIndex = this.zIndex + 1;
         this.dom.style.zIndex = this.zIndex;
         this.dom.classList.add("active");
         return this;
+    }
+
+    confirm(){
+        return new Promise((resolve)=>{
+            this.show();
+            this.hide_event = ()=>{
+                resolve();
+            }
+        });
     }
 
     make_trigger(trigger_id){
@@ -301,10 +333,12 @@ class Modal{
         yes_btn.textContent = name;
         yes_btn.addEventListener("click",function(){
             if(typeof(func)==="function"){
-                func();
+                self.result = true;
+                if(typeof(func)==="function"){func()};
                 self.hide();
             }
         });
+        this.yes_btn = yes_btn;
         this.foot_btns.append(Modal.html(yes_btn));
         return this;
     }
@@ -317,10 +351,12 @@ class Modal{
         no_btn.textContent = name;
         no_btn.addEventListener("click",function(){
             if(typeof(func)==="function"){
-                func();
+                self.result = false;
+                if(typeof(func)==="function"){func()};
                 self.hide();
             }
         });
+        this.no_btn = no_btn;
         this.foot_btns.append(Modal.html(no_btn));
         return this;
     }
