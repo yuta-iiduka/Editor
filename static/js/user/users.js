@@ -4,27 +4,29 @@ const u = new TableWrapper("#users");
 u.build();
 
 const t = new TableBuilder("#t");
-t.columns = [{field:"id",label:"ID",type:"int"},{field:"name",label:"NAME",type:"str"}];
+t.columns = [{field:"id",label:"ID",type:"int"},{field:"name",label:"NAME",type:"str"},{field:"email",label:"EMAIL",type:"str"}];
 t.data = [
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:1,name:"name1"},
-    {id:2,name:"name2"},
-    {id:3,name:"name3"},
-    {id:4,name:"name4"},
-    {id:5,name:"name5"},
-    {id:6,name:"name6"},
-    {id:7,name:"name7"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:1,name:"name1",email:"sample@gmail.com"},
+    {id:2,name:"name2",email:"sample@gmail.com"},
+    {id:3,name:"name3",email:"sample@gmail.com"},
+    {id:4,name:"name4",email:"sample@gmail.com"},
+    {id:5,name:"name5",email:"sample@gmail.com"},
+    {id:6,name:"name6",email:"sample@gmail.com"},
+    {id:7,name:"name7",email:"sample@gmail.com"},
 ];
-t.pp = 5;
+t.url = `${window.location.protocol}//${window.location.host}/user/api/users`;
+t.pp = 2;
+t.is_update = true;
 t.build();
 
 const g = new Grid(32,32);

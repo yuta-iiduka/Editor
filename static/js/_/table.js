@@ -121,6 +121,7 @@ class Table extends DOM{
         this._columns = null;
         this._diff = null;
         this._base = null;
+        this._url = null;
 
         this.table = null;
         this.head = null;
@@ -135,6 +136,7 @@ class Table extends DOM{
         this.is_paginate = true;
         this.is_update = false;
         this.is_reload = false;
+        this.is_request = false;
 
         this.active_filterable = true;
         this.active_sortable = true;
@@ -151,6 +153,29 @@ class Table extends DOM{
 
     }
 
+    get url(){
+        return this._url === null ? window.location.href : this._url;
+    }
+
+    set url(x){
+        this._url = x;
+    }
+
+    get_url_param(key){
+        const url = new URL(this.url);
+        const params = new URLSearchParams(url.search);
+        return params.get(key);
+    }
+
+    set_url_param(key,val){
+        const url = new URL(this.url);
+        const params = new URLSearchParams(url.search);
+        params.set(key,val);
+        url.search = params.toString();
+        this.url = url.href;
+        // window.history.replaceState({},"",url);
+    }
+
     get rid(){
         return this._rid++;
     }
@@ -165,6 +190,9 @@ class Table extends DOM{
 
     set so(param){
         Table.set_url_param(`so${this.id}`,JSON.stringify(param));
+        if(this.is_update){
+            this.set_url_param(`so${this.id}`,JSON.stringify(param));
+        }
     }
 
     get fi(){
@@ -173,6 +201,9 @@ class Table extends DOM{
 
     set fi(param){
         Table.set_url_param(`fi${this.id}`,JSON.stringify(param));
+        if(this.is_update){
+            this.set_url_param(`fi${this.id}`,JSON.stringify(param));
+        }
     }
 
     /**
@@ -184,6 +215,9 @@ class Table extends DOM{
 
     set pa(param){
         Table.set_url_param(`pa${this.id}`,JSON.stringify(param));
+        if(this.is_update){
+            this.set_url_param(`pa${this.id}`,JSON.stringify(param));
+        }
     }
 
     /**
@@ -195,6 +229,9 @@ class Table extends DOM{
 
     set pp(param){
         Table.set_url_param(`pp${this.id}`,JSON.stringify(param));
+        if(this.is_update){
+            this.set_url_param(`pp${this.id}`,JSON.stringify(param));
+        }
     }
 
     /**
@@ -206,6 +243,9 @@ class Table extends DOM{
 
     set dl(param){
         Table.set_url_param(`dl${this.id}`,JSON.stringify(param));
+        if(this.is_update){
+            this.set_url_param(`dl${this.id}`,JSON.stringify(param));
+        }
     }
 
     /**
@@ -444,18 +484,19 @@ class Table extends DOM{
     /**
      * リクエスト
      */
-    fetch(){
+    fetch(get_url){
         // 画面遷移を伴う通信でデータを取得する場合
         // 初期化時に何もしないで、それ以降にソートリクエストを送る
 
         // 画面遷移を伴わない通信でデータを取得する場合
         // 初期化時にソートリクエストを送る
-        const rj = new RequestJSON();
-        rj.fetchGet();
-        this.rows = rj.res_data;
-
-        // 通信をしない場合
-        
+        const rj = new RequestJSON(get_url);
+        rj.set_func((d)=>{this.data=d;});
+        rj.set_error_func((d)=>{alert(d)})
+        rj.get();
+        // rj.fetchGet(get);
+        // this.rows = rj.res_data;
+        // this.data = rj.res_data;
     }
 
     reload(){
@@ -615,6 +656,11 @@ class Table extends DOM{
     build(){
         if(Table.is_init === false){
             this.css = new Style(Table.style);
+            this.fi = this.fi;
+            this.pp = this.pp;
+            this.pa = this.pa;
+            this.dl = this.dl;
+            this.so = this.so;
         }
         return super.build();
     }
@@ -644,7 +690,6 @@ class TableBuilder extends Table{
 
     constructor(selector){
         super(selector);
-
         this.is_built = false;
 
     }
@@ -690,9 +735,9 @@ class TableBuilder extends Table{
         this.body.innerHTML = "";
         this.rows = this.data;
 
-        // データ更新を伴う場合
+        // データの部分更新を伴う場合
         if(this.is_update === true){
-            this.fetch();
+            this.fetch(this.url);
 
         // データリロードを伴う場合
         }else if(this.is_reload === true){
@@ -700,29 +745,30 @@ class TableBuilder extends Table{
             this.reload();
             
         // データ更新を伴わない場合
-        }else{
-            if(this.is_filtable){
-                if(this.active_filterable){
-                    if(this.fi){this.rows = this.filter();}
-                }else{
-                    this.diff = null;
-                }
-                this.frame.prepend(this.ui_filter());
+        }
+
+        if(this.is_filtable){
+            if(this.active_filterable){
+                if(this.fi){this.rows = this.filter();}
+            }else{
+                this.diff = null;
             }
-            if(this.is_sortable){
-                if(this.so){this.rows = this.sort();}
-                this.ui_sort();
-            }
-            if(this.is_paginate){
-                if(typeof(this.pp) === "number" && this.pp > 0){this.page_data = this.paginate();}
-                this.frame.append(this.ui_pagination());
-                if(typeof(this.pa) === "number"){
-                    this.rows = this.page_data[this.pa];
-                }else{
-                    this.rows = this.page_data[0];
-                }
+            this.frame.prepend(this.ui_filter());
+        }
+        if(this.is_sortable){
+            if(this.so){this.rows = this.sort();}
+            this.ui_sort();
+        }
+        if(this.is_paginate){
+            if(typeof(this.pp) === "number" && this.pp > 0){this.page_data = this.paginate();}
+            this.frame.append(this.ui_pagination());
+            if(typeof(this.pa) === "number"){
+                this.rows = this.page_data[this.pa];
+            }else{
+                this.rows = this.page_data[0];
             }
         }
+
         // tbodyにレコードを追加
         if( this.rows && this.rows.length > 0 ){
             // 設定に応じて描写
@@ -1085,10 +1131,5 @@ class TableWrapper extends TableBuilder{
         super.build();
         return this;
     }
-
-}
-
-
-class TableRequest extends TableBuilder{
 
 }

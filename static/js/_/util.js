@@ -584,6 +584,7 @@ class Block{
         this.ratio = {w:1,h:1};
         this._p = {x:this.x,y:this.y,z:this.z,w:this.w,h:this.h};
         this.gap = {x:0,y:0,z:0,w:0,h:0};
+        this.laps = [];
         
         // DOM情報
         this.dom = null;
@@ -622,7 +623,7 @@ class Block{
         this._fit = (p)=>{
             let lap = false;
             for(let b of Block.list){
-                if(b.visible === true && b !== this && b.overlap(this)){
+                if(b.visible === true && b !== this && this.overlap(b)){
                     this.style.backgroundColor = this.storongBackgroundColor;
                     lap = true;
                 }
@@ -630,8 +631,9 @@ class Block{
             if(lap === false){
                 this.style.backgroundColor = this.baseBackgroundColor;
             }
+            this.draw();
         };
-        this._collide = function(b){console.log(b);}
+        this._collide = (b)=>{b.draw();}
         this._resize = null;
 
         Block.list.push(this);
@@ -956,7 +958,7 @@ class Block{
             // 重なり判定
             let lap = false;
             for(let b of Block.list){
-                if(b.visible === true && b !== self && b.overlap(self)){
+                if(b.visible === true && b !== self && self.overlap(b)){
                     self.style.backgroundColor = self.storongBackgroundColor;
                     lap = true;
                 }
@@ -1042,7 +1044,15 @@ class Block{
         if(this.visible === true && b.visible === true){
             result = Block.isOverlapping(this,b);
             if(result){
+                if(!this.laps.includes(b)){this.laps.push(b);}
                 new Promise((resolve)=>{this.collide(b);resolve();});
+                new Promise((resolve)=>{b.collide(this);resolve();});
+            }else{
+                this.laps = this.laps.filter((x)=>x.id !== b.id)
+                new Promise((resolve)=>{
+                    this.draw();
+                    b.draw();
+                })
             }
         }
         return result 
