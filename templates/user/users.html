@@ -8,6 +8,7 @@
                     <th data-field="id"    data-type="int">ID</th>
                     <th data-field="name"  data-type="str">Name</th>
                     <th data-field="email" data-type="str">Email</th>
+                    <th data-field="input" data-type="str">Input</th>
                 </tr>
             </thead>
             <tbody>
@@ -16,6 +17,7 @@
                     <td data-id="{{loop.index}}"    >{{loop.index}}</td>
                     <td data-name="{{user.name}}"   >{{user.name}}</td>
                     <td data-email="{{user.email}}" >{{user.email}}</td>
+                    <td data-input="{{user.name}}{{loop.index}}"  ><input value="{{user.name}}"></td>
                 </tr>
                 {% endfor %}
             </tbody>

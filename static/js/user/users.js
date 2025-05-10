@@ -1,6 +1,7 @@
 
 
 const u = new TableWrapper("#users");
+u.pp = 2;
 u.build();
 
 const t = new TableBuilder("#t");
@@ -112,4 +113,5 @@ btn3.addEventListener("click", async function(){
         alert("通信に失敗しました");
     }
     console.log("btn3");
-})
+});
+

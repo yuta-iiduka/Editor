@@ -406,6 +406,14 @@ class Table extends DOM{
                         self.click_td(td);
                     }
                 });
+                const inputs = td.querySelectorAll("input");
+                for(let input of inputs){
+                    input.addEventListener("input",function(e){
+                        input.setAttribute("value",e.target.value);
+                        td.dataset.value = td.innerHTML;
+                        row[field] = td.dataset.value;
+                    });
+                }
                 tr.appendChild(td);
             }else if(field === "dataset"){
                 const keys = Object.keys(row[field]);

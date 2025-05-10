@@ -2023,6 +2023,8 @@ class Sort{
                 val = a[field].localeCompare(b[field]) * desc;
             }else if(type === "int"){
                 val = a[field] * desc - b[field] * desc; 
+            }else if(type === "num"){
+                val = a[field] * desc - b[field] * desc; 
             }else if(type === "datetime"){
                 val = new Date(a[field]) > new Date(b[field]) ? desc : -1 * desc;
             }
