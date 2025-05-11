@@ -5,19 +5,21 @@
         <table>
             <thead>
                 <tr>
+                    <th data-field="check" data-type="check">CHECK</th>
                     <th data-field="id"    data-type="int">ID</th>
                     <th data-field="name"  data-type="str">Name</th>
                     <th data-field="email" data-type="str">Email</th>
-                    <th data-field="input" data-type="str">Input</th>
+                    <th data-field="input" data-type="input">Input</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
                 <tr>
+                    <td data-check=""    ><input type="checkbox" value /></td>
                     <td data-id="{{loop.index}}"    >{{loop.index}}</td>
                     <td data-name="{{user.name}}"   >{{user.name}}</td>
                     <td data-email="{{user.email}}" >{{user.email}}</td>
-                    <td data-input="{{user.name}}{{loop.index}}"  ><input value="{{user.name}}"></td>
+                    <td data-input="{{user.name}}{{loop.index}}"  ><input type="text" value="{{user.name}}"></td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -25,6 +27,7 @@
         </table>
     </div>
     <div id="t"></div>
+    <div id="j"></div>
     <div id="btn1" data-url="{{url_for('user.v1_num',num=12)}}">XHR1</div>
     <div id="btn2" data-url="{{url_for('user.v2_num',num=12)}}">XHR2</div>
     <div id="btn3" data-url="{{url_for('user.v2_num',num=12)}}">fetch</div>

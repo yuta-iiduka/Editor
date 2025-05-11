@@ -406,10 +406,23 @@ class Table extends DOM{
                         self.click_td(td);
                     }
                 });
-                const inputs = td.querySelectorAll("input");
+                const inputs = td.querySelectorAll("input[type=text]");
                 for(let input of inputs){
                     input.addEventListener("input",function(e){
                         input.setAttribute("value",e.target.value);
+                        td.dataset.value = td.innerHTML;
+                        row[field] = td.dataset.value;
+                    });
+                }
+                const checks = td.querySelectorAll("input[type=checkbox]");
+                for(let check of checks){
+                    check.addEventListener("change",function(e){
+                        const c = check.checked;
+                        if(c){
+                            check.setAttribute("checked",c);
+                        }else{
+                            check.removeAttribute("checked");
+                        }
                         td.dataset.value = td.innerHTML;
                         row[field] = td.dataset.value;
                     });
@@ -807,12 +820,14 @@ class TableBuilder extends Table{
                 const sel_af = DOM.create("select",{class:"select_and_frame"});
                 for(let col of self.columns){
                     const option = document.createElement("option");
-                    option.value = col.field;
-                    option.dataset.typ = col.type;
-                    option.dataset.lbl = col.label;
-                    option.dataset.fld = col.field;
-                    option.textContent = `${col.label}:${col.type}`;
-                    sel_af.appendChild(option);
+                    if(col.type !== "input"){
+                        option.value = col.field;
+                        option.dataset.typ = col.type;
+                        option.dataset.lbl = col.label;
+                        option.dataset.fld = col.field;
+                        option.textContent = `${col.label}:${col.type}`;
+                        sel_af.appendChild(option);
+                    }
                 }
 
                 // AND条件追加
@@ -868,8 +883,7 @@ class TableBuilder extends Table{
                 // AND比較演算子選択
                 const sel_af = DOM.create("select",{class:"select_and_frame"});
                 // ANDフォーム
-                const form_af = DOM.create("input",{class:"and_form"});
-                form_af.value = con.value;
+                const form_af = add_setting_form(con);
                 // AND削除ボタン
                 const del_af = DOM.create("div",{class:"del_and_frame"});
                 del_af.textContent = "削除";
@@ -898,6 +912,24 @@ class TableBuilder extends Table{
                     }
                 }
                 return select;
+            }
+
+            // タイプによって、設定値フォームを変更する
+            function add_setting_form(con){
+                let form = null;
+                if(con.type === "check"){
+                    form = DOM.create("input",{class:"and_form"});
+                    form.type = "hidden";
+
+                }else if(con.type === "input"){
+                    form = DOM.create("input",{class:"and_form"});
+                    form.type = "hidden";
+                }else{
+                    form = DOM.create("input",{class:"and_form"});
+                    form.value = con.value;
+                }
+
+                return form;
             }
 
             for(let con of condition){
