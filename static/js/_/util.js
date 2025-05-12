@@ -2594,14 +2594,18 @@ class JSONEditor extends DOM{
     form_str(val=""){
         const textarea = document.createElement("textarea");
         textarea.value = val;
-        return textarea;
+        const form = document.createElement("div");
+        form.appendChild(textarea);
+        return form;
     }
 
     form_num(val=0){
         const input = document.createElement("input");
         input.type = "number";
         input.value = val;
-        return input;
+        const form = document.createElement("div");
+        form.appendChild(input);
+        return form;
     }
 
     form_bool(val){
@@ -2630,42 +2634,33 @@ class JSONEditor extends DOM{
     }
 
     /**
-     *  if(this.result === null){
-            if(this.contents.firstElementChild.dataset.type === "jef-object"){
-                this.result = {};        
-            }else if(this.contents.firstElementChild.dataset.type === "jef-array"){
-                this.result = [];
-            }
-        }
-     * @param {*} part 
+     *  
+     * @param {Node} part 
      * @returns 
      */
     form_analize(part=null){
+        if(part === null){ part = this.contents.firstElementChild }
         let tmp = null
         // datasetを全て親要素にするように統一すれば、再帰探索可能
-        if(part !== null){
-            if(part.dataset.type==="jef-str"){
-                console.log(part.value);
-                tmp = part.value;
-            }else if(part.dataset.type==="jef-num"){
-                console.log(part.value);
-                tmp = part.value;
-            }else if(part.dataset.type==="jef-bool"){
-                console.log(part.querySelector("input:checked").parentElement.textContent.toLowerCase());
-                tmp = part.querySelector("input:checked").parentElement.textContent.toLowerCase()
-            }else if(part.dataset.type==="jef-array"){
-                const item = c.childNodes;
-                tmp = [];
-                for(let x of item){
-                    console.log(x);
-                    tmp.push(this.form_analize(x));
-                }
-            }else if(part.dataset.type==="jef-object"){
-                const item = c.childNodes;
-                for(let x of item){
-                    console.log(x.querySelector(":scope > .jef-val"));
-                    tmp[x.querySelector(":scope > .jef-key").textContent]=this.form_analize(x.querySelector(":scope > .jef-val"));
-                }
+        if(part.dataset.type==="jef-str"){
+            tmp = part.querySelector("textarea").value;
+        }else if(part.dataset.type==="jef-num"){
+            tmp = JSON.parse(part.querySelector("input").value);
+        }else if(part.dataset.type==="jef-bool"){
+            tmp = JSON.parse(part.querySelector("input:checked").parentElement.textContent.toLowerCase());
+        }else if(part.dataset.type==="jef-array"){
+            const item = part.childNodes;
+            tmp = [];
+            for(let x of item){
+                console.log(x);
+                tmp.push(this.form_analize(x));
+            }
+        }else if(part.dataset.type==="jef-object"){
+            const item = part.childNodes;
+            tmp = {};
+            for(let x of item){
+                console.log(x.querySelector(":scope > .jef-val"));
+                tmp[x.querySelector(":scope > .jef-key").textContent]=this.form_analize(x.querySelector(":scope > .jef-val").firstElementChild);
             }
         }
 
