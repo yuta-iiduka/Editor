@@ -1,0 +1,51 @@
+# nuitka --windows-disable-console --standalone --onefile --enable-plugin=tk-inter --windows-icon-from-ico=“アイコンファイル.ico” ファイル名.py
+
+# Nuitka-Options: Used command line options:
+# Nuitka-Options:   --standalone --onefile --enable-plugin=tk-inter .\sample.py
+# Nuitka: Starting Python compilation with:
+# Nuitka:   Version '2.7.2' on Python 3.9 (flavor 'CPython Official') commercial grade 'not installed'.
+# Nuitka: Completed Python level compilation and optimization.
+# Nuitka: Generating source code for C backend compiler.
+# Nuitka: Running data composer tool for optimal constant value handling.
+# Nuitka: Running C compilation via Scons.
+# Nuitka will use gcc from MinGW64 of winlibs to compile on Windows.
+
+# Is it OK to download and put it in 'C:\Users\yuta\AppData\Local\Nuitka\Nuitka\Cache\DOWNLO~1\gcc\x86_64\14.2.0posix-19.1.1-12.0.0-msvcrt-r2'.
+
+# Fully automatic, cached. Proceed and download? [Yes]/No : y
+# Nuitka: Downloading 'https://github.com/brechtsanders/winlibs_mingw/releases/download/14.2.0posix-19.1.1-12.0.0-msvcrt-r2/winlibs-x86_64-posix-seh-gcc-14.2.0-llvm-19.1.1-mingw-w64msvcrt-12.0.0-r2.zip'.
+# Nuitka: Extracting to 'C:\Users\yuta\AppData\Local\Nuitka\Nuitka\Cache\DOWNLO~1\gcc\x86_64\14.2.0posix-19.1.1-12.0.0-msvcrt-r2\mingw64\bin\gcc.exe'
+# Nuitka-Scons: Backend C compiler: gcc (gcc 14.2.0).
+# Nuitka-Scons: Backend C linking with 8 files (no progress information available for this stage).
+# Nuitka-Scons: Compiled 8 C files using ccache.
+# Nuitka-Scons: Cached C files (using ccache) with result 'cache miss': 8
+# Nuitka-Plugins:tk-inter: Included 87 data files due to Tk needed for tkinter usage.
+# Nuitka-Plugins:tk-inter: Included 835 data files due to Tcl needed for tkinter usage.
+# Nuitka will make use of Dependency Walker (https://dependencywalker.com) tool
+# to analyze the dependencies of Python extension modules.
+
+# Is it OK to download and put it in 'C:\Users\yuta\AppData\Local\Nuitka\Nuitka\Cache\DOWNLO~1\depends\x86_64'.
+
+# Fully automatic, cached. Proceed and download? [Yes]/No : y
+# Nuitka: Downloading 'https://dependencywalker.com/depends22_x64.zip'.
+# Nuitka: Extracting to 'C:\Users\yuta\AppData\Local\Nuitka\Nuitka\Cache\DOWNLO~1\depends\x86_64\depends.exe'
+# Nuitka-Postprocessing: Creating single file from dist folder, this may take a while.
+# Nuitka-Onefile: Running bootstrap binary compilation via Scons.
+# Nuitka-Scons: Onefile C compiler: gcc (gcc 14.2.0).
+# Nuitka-Scons: Onefile C linking.
+# Nuitka-Scons: Compiled 1 C files using ccache.
+# Nuitka-Scons: Cached C files (using ccache) with result 'cache miss': 1
+# Nuitka-Onefile: Using compression for onefile payload.
+# Nuitka-Onefile: Onefile payload compression ratio (28.75%) size 17165010 to 4935132.
+# Nuitka-Onefile: Keeping onefile build directory 'sample.onefile-build'.
+# Nuitka: Keeping dist folder 'sample.dist' for inspection, no need to use it.
+# Nuitka: Keeping build directory 'sample.build'.
+# Nuitka: Successfully created 'C:\_APP\sample.exe'.
+
+# Package     Version
+# ----------- -------
+# Nuitka      2.7.2
+# ordered-set 4.1.0
+# pip         22.0.4
+# setuptools  58.1.0
+# zstandard   0.23.0
