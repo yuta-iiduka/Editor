@@ -2,6 +2,13 @@
 import json,csv
 import xml.etree.ElementTree as ET
 
+# YAML対応する場合
+# pip install ruamel.yaml
+# ruamel.yaml      0.18.10
+# ruamel.yaml.clib 0.2.12
+from ruamel.yaml import YAML
+
+
 class FileData():
 
     """
@@ -80,6 +87,43 @@ class JsonData(FileData):
     def _write(self,file):
         json.dump(self.data,file,indent=4,ensure_ascii=False)
 
+class YamlData(FileData):
+    def __init__(self,file_path):
+        self.yaml = YAML()
+        super().__init__(file_path)
+
+    def _read(self,file):
+        self.data = self.yaml.load(file)
+        # print(self.data)
+
+    def _write(self,file):
+        self.yaml.dump(self.data, file)
+
+    def get_comment(self,key):
+        # 0:pre → キーの前のコメント
+        # 1:key_comment → キーの上にあるコメント（# のあと）
+        # 2:eol_comment → 行末コメント（← ここ！）
+        # 3:post_comment → 値の後のコメント（次のブロック前など）
+        co = self.data.ca.items[key]
+        if len(co) > 1 and co[2]:
+            return co[2].value.strip()
+        else:
+            return ""
+
+    def set_comment(self,key,val):
+        self.data.yaml_add_eol_comment(val, key=key)
+
+    def get_comments(self,dct=None):
+        items = dct
+        if dct is None:
+            items = self.data.items()
+        comments = []
+        for k,v in items:
+            comments.append(self.get_comment(k))
+            if type(v) == dict:
+                comments = comments + self.get_comments(v)
+        return comments
+        
 class TextData(FileData):
     def __init__(self,file_path):
         super().__init__(file_path)
@@ -157,5 +201,12 @@ if __name__ == "__main__":
     # TextData("param/const.json")  
     # JsonEnv()
     # CSVData("sample.csv")
-    d = XMLData("etc/sample.drawio.xml")
+    # d = XMLData("etc/sample.drawio.xml")
+    y = YamlData("etc/sample.yaml")
+    print(y.data)
+    print(y.get_comment("version"))
+    print(y.get_comments())
+    # y.set_comment("sample","コメント")
+    # y.write()
+    
 

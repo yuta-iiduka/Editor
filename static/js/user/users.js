@@ -115,3 +115,43 @@ btn3.addEventListener("click", async function(){
     console.log("btn3");
 });
 
+
+const je = new DataEditor("#j");
+// je.data = [
+//     {
+//         "aaa":"bbb",
+//         "ccc":[
+//             "xxx",
+//             "bbb",
+//             {
+//                 "sample":[
+//                     "s1",
+//                     "s2"
+//                 ]
+//             }
+//         ]
+//     },
+//     [
+//         1,2,3,false
+//     ]
+// ];
+// je.build();
+
+const jr = new RequestJSON("/user/yaml");
+jr.set_func(function(j){
+    console.log(j);
+    je.data = j.data;
+    const comments = j.comments;
+    je.build()
+    for(let i=0; i<comments.length; i++){
+        const dom = je.search_comment_by_index(i);
+        if(dom){
+            dom.textContent = comments[i];
+        }
+    }
+})
+jr.get();
+
+const contextmenu = new ContextMenu("#j");
+contextmenu.append("aaa").append("bbb").append("ccc");
+contextmenu.build();

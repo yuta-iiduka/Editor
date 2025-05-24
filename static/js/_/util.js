@@ -2485,13 +2485,150 @@ class DateTime{
     }
 }
 
-class JSONEditor extends DOM{
+class ContextMenu extends DOM{
+
+    constructor(selector="body"){
+        super(selector);
+        this.is_active = false;
+        this.zIndex = 1;
+        this.color = "white";
+        this.backgroundColor = "black";
+        this.list = [];
+    }
+
+    get left(){
+        return this.contents.style.left;
+    }
+
+    get top(){
+        return this.contents.style.top;
+    }
+
+    get width(){
+        return this.contents.clientWidth;
+    }
+
+    get height(){
+        return this.contents.clientHeight;
+    }
+
+    style(){
+        return new Style(`
+            .frame-${this.type()}{
+                position: fixed;
+                display: none;
+            }
+            .frame-${this.type()}.active{
+                display: block;
+            }
+            .contextmenu-list{
+                padding: 4px;
+                background-color: ${this.backgroundColor};
+                color: ${this.color};
+            }
+        `);
+    }
+
+    append(name,func=()=>{console.log("clicked.");}){
+        this.list.push({
+            "name":name,
+            "func":func,
+        });
+        return this;
+    }
+
+    remove(name){
+        this.list = this.list.filter((l)=> l.name !== name );
+        return this;
+    }
+
+
+    make(){
+        const elm =  super.make();
+        return elm;
+    }
+
+    set_menu(){
+        this.contents.innerHTML = "";
+        for(let m of this.list){
+            const div = DOM.create("div",{class:"contextmenu-list"});
+            div.addEventListener("click",(e)=>{
+                m.func(e);
+                this.hide();
+            });
+            div.textContent = m.name;
+            this.contents.appendChild(div);
+        }
+        return this;
+    }
+
+    show(x,y){
+        this.is_active = true;
+        this.frame.classList.add("active");
+        console.log(x,y);
+        this.contents.style.position = "fixed";
+        this.contents.style.left = `${x}px`;
+        this.contents.style.top = `${y}px`;
+        this.contents.style.zIndex = this.zIndex;
+    }
+    
+    hide(e){
+        this.is_active = false;
+        this.frame.classList.remove("active");
+    }
+
+    event(){
+        this.parent.addEventListener("contextmenu",(e)=>{
+            e.preventDefault();
+            console.log(e.target);
+            this.show(this.autoX(e.pageX),this.autoY(e.pageY));
+        });
+    }
+
+    autoX(x){
+        return x;
+    }
+
+    autoY(y){
+        return y;
+    }
+
+    build(){
+        super.build();
+        this.css = this.style();
+        this.css.build();
+        this.event();
+        this.set_menu();
+    }
+
+}
+
+class DataEditor extends DOM{
+    static parse_jp = {string:"文字列",number:"数値",boolean:"真偽値",object:"参照型",array:"配列"}
+
+    static type_jp(val){
+        let result = "";
+        if(typeof(val) === "string" ){
+            result = DataEditor.parse_jp[typeof(val)];
+        }else if(typeof(val) === "number"){
+            result = DataEditor.parse_jp[typeof(val)];
+        }else if(typeof(val) === "boolean"){
+            result = DataEditor.parse_jp[typeof(val)];
+        }else if(Array.isArray(val)){
+            result = DataEditor.parse_jp["array"];
+        }else if(typeof(val) === "object"){
+            result = DataEditor.parse_jp["object"];
+        }
+        return result;
+    }
 
     constructor(selector="body",data=null){
         super(selector);
         this._data = data;
         this.result = null;
         this.radioCnt = 0;
+        this.is_enable_changekeys = false;
+
     }
 
     get data(){
@@ -2508,7 +2645,7 @@ class JSONEditor extends DOM{
 
     style(){
         return new Style(`
-            /* JSONEditorのCSS */
+            /* DataEditorのCSS */
             .frame-${this.type()}{
                 border:1px solid white;
             }
@@ -2530,16 +2667,52 @@ class JSONEditor extends DOM{
             .jef-object{
                 padding:2px;
             }
+            .jef-item{
+                display:flex;
+                flex-direction:row;
+            }
             .jef-key{
                 padding:2px;
+                width:90px;
+            }
+            .jef-typ{
+                padding:2px;
+                width:60px;
             }
             .jef-val{
                 padding:2px;
+                width: calc(80% - 158px);
             }
             .jef-bool{
                 padding:2px;
                 display:flex;
                 font-size:12px;
+            }
+            .jef-come{
+                padding:2px;
+                width: 20%;
+            }
+            .jef-header{
+                display:flex;
+                border: 1px solid white;
+            }
+            .jef-head-key{
+                padding:2px;
+                width:90px;
+            }
+            .jef-head-typ{
+                padding:2px;
+                width: 60px;
+            }
+
+            .jef-head-val{
+                padding:2px;
+                width: calc(80% - 158px);
+
+            }
+            .jef-head-come{
+                padding:2px;
+                width: 20%;
             }
             
         `);
@@ -2548,6 +2721,41 @@ class JSONEditor extends DOM{
     make(){
         const elm = super.make();
         return elm;
+    }
+
+    search_form_by_key(key="key"){
+        const items = this.contents.querySelectorAll(".jef-item");
+        for(let item of items){
+            const k = item.querySelector(":scope > .jef-key");
+            if(k.textContent === key){
+                return item;
+            }
+        }
+        return null;
+    }
+
+    search_comment_by_key(key="key"){
+        const item = this.search_form_by_key(key);
+        if(item){
+            return item.querySelector(":scope > .jef-come");
+        }
+        return null;
+    }
+
+    search_form_by_index(index=0){
+        const items = this.contents.querySelectorAll(".jef-item");
+        if(items && items.length > index){
+            return items[index];
+        }
+        return null;
+    }
+
+    search_comment_by_index(index=0){
+        const item = this.search_form_by_index(index);
+        if(item){
+            return item.querySelector(":scope > .jef-come");
+        }
+        return null;
     }
 
     form(frame=null,part=null,func=function(d){console.log(d)}){
@@ -2576,16 +2784,35 @@ class JSONEditor extends DOM{
         }else if(typeof(val) === "object"){
             const obj = DOM.create("div",{class:"jef-object"});
             obj.dataset.type = "jef-object";
+            const header = DOM.create("div",{class:"jef-header"});
+            const headkey = DOM.create("div",{class:"jef-head-key"});
+            headkey.textContent = "キー";
+            const headtyp = DOM.create("div",{class:"jef-head-typ"});
+            headtyp.textContent = "型";
+            const headval = DOM.create("div",{class:"jef-head-val"});
+            headval.textContent = "値";
+            const headcome = DOM.create("div",{class:"jef-head-come"});
+            headcome.textContent = "説明";
+            header.appendChild(headkey);
+            header.appendChild(headtyp);
+            header.appendChild(headval);
+            header.appendChild(headcome);
+            obj.appendChild(header);
             frame.appendChild(obj);
-            for(let keys of Object.keys(val)){
+            for(let key of Object.keys(val)){
                 const objitem = DOM.create("div",{class:"jef-item"});
                 const objkey = DOM.create("div",{class:"jef-key"});
-                objkey.appendChild(document.createTextNode(keys));
+                objkey.appendChild(document.createTextNode(key));
+                const objtyp = DOM.create("div",{class:"jef-typ"});
+                objtyp.appendChild(document.createTextNode(DataEditor.type_jp(val[key])));
                 const objval = DOM.create("div",{class:"jef-val"});
+                const objcome = DOM.create("div",{class:"jef-come"});
                 objitem.appendChild(objkey);
+                objitem.appendChild(objtyp);
                 objitem.appendChild(objval);
+                objitem.appendChild(objcome);
                 obj.appendChild(objitem);
-                this.form(objval,val[keys]);
+                this.form(objval,val[key]);
             }
         }
         return val;
@@ -2660,11 +2887,25 @@ class JSONEditor extends DOM{
             tmp = {};
             for(let x of item){
                 console.log(x.querySelector(":scope > .jef-val"));
-                tmp[x.querySelector(":scope > .jef-key").textContent]=this.form_analize(x.querySelector(":scope > .jef-val").firstElementChild);
+                const k = x.querySelector(":scope > .jef-key");
+                if(k){
+                    tmp[k.textContent]=this.form_analize(x.querySelector(":scope > .jef-val").firstElementChild);
+                }
             }
         }
 
         return tmp;
+    }
+
+    enable_changekeys(flag=true){
+        this.is_enable_changekeys = flag;
+        const keys = this.contents.querySelectorAll(".jef-key");
+        console.log(keys);
+        for(let k of keys){
+            k.contentEditable = flag;
+        }
+
+        return flag;
     }
 
 
@@ -2682,26 +2923,6 @@ class JSONEditor extends DOM{
 
 }
 
-je = new JSONEditor("#j");
-je.data = [
-    {
-        "aaa":"bbb",
-        "ccc":[
-            "xxx",
-            "bbb",
-            {
-                "sample":[
-                    "s1",
-                    "s2"
-                ]
-            }
-        ]
-    },
-    [
-        1,2,3,false
-    ]
-];
-je.build();
 
 // let f = new Filter();
 //     f.set_condition(
