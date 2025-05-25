@@ -1,7 +1,7 @@
 from common.validation import Check
 from flask import (
     Blueprint,render_template,redirect,jsonify,
-    url_for,flash,request
+    url_for,flash,request, send_file
 )
 from db.db import db, transaction, Users, tableinfo
 from flask_login import (
@@ -9,6 +9,8 @@ from flask_login import (
     login_required, login_user, logout_user
 )
 from logger import logger, log
+from common.file import YamlData
+
 login_manager = LoginManager()
 login_manager.login_view = "user.login"
 login_manager.login_message = ""
@@ -19,6 +21,17 @@ def load_user(user_id):
 NAME = "user"
 URL_PREFIX = "/{}".format(NAME)
 app = Blueprint(NAME, __name__, url_prefix=URL_PREFIX)
+
+# def test(*args,**kwargs):
+#     c = Check(*args,**kwargs)
+#     print(c.data)
+#     return render_template(*args,**kwargs)
+
+# @app.route("/test/<y>",methods=["GET"])
+# @Check.late(test,"user/login.html",xxx="xxx")
+# @Check.min("y",10)
+# def testView(y=None):
+#     return render_template("user/users.html",users=Users.query.all())
 
 @app.route("/login",methods=["GET","POST"])
 @transaction
@@ -33,10 +46,10 @@ def login():
         if user is not None:
             if user.verify_password(password):
                 login_user(user)
-                if next is not None:
+                if next is not None and next != "":
                     return redirect(next)
                 else:
-                    return redirect("/")
+                    return redirect(url_for("user.users"))
             else:
                 flash("パスワードが違います。")
         else:
@@ -114,7 +127,8 @@ def api_users():
     lst = []
     users = Users.query.all()
     for u in users:
-        lst.append({"email":u.email})
+        lst.append({"id":u.id,"name":u.name,"email":u.email})
+    print(lst)
     return jsonify(lst)
 
 @app.route("/g", methods=["GET"])
@@ -123,7 +137,8 @@ def gg():
     return render_template("user/g.html")
 
 
-@app.route("/api/v1/<num>", methods=["GET"])
+@app.route("/api/v1/<num>", methods=["GET","POST"])
+@login_required
 @Check.min("num",10)
 def v1_num(num):
     c = Check()
@@ -131,10 +146,27 @@ def v1_num(num):
     print(c.result)
     return jsonify({"num":num})
 
-@app.route("/api/v2/<num>", methods=["GET"])
+@app.route("/api/v2/<num>", methods=["GET","POST"])
+@login_required
 @Check.min("num",10)
 def v2_num(num):
     c = Check()
     print(c.message)
     print(c.result)
     return jsonify({"num":num})
+
+@app.route("/yaml",methods=["GET"])
+@login_required
+def yaml():
+    y = YamlData("etc/sample.yaml")
+    print(y.data)
+    # d = {"data":{"yaml":y.array(y.data),"comments":y.array(y.get_comments())}}
+    d = {"data":{"yaml":y.data,"comments":y.get_comments()}}
+    print(d)
+    return jsonify(d)
+
+
+@app.route("/download",methods=["GET"])
+@login_required
+def etc_file():
+    return send_file("etc/sample.back.yaml",as_attachment=True)

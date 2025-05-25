@@ -155,3 +155,18 @@ jr.get();
 const contextmenu = new ContextMenu("#j");
 contextmenu.append("aaa").append("bbb").append("ccc");
 contextmenu.build();
+
+let file = null;
+fetch("/user/download")
+.then(response => response.blob())
+.then(blob=>{
+    file = new File([blob], "sample.back.yaml", {type:blob.type});
+    console.log("file",file);
+    new Promise((resolve)=>{
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        return reader.readAsText(file);
+    }).then(text=>{
+        console.log("file-text",text);
+    });
+});
