@@ -175,10 +175,12 @@ class Grid{
         this.id = Grid.id++;
         this.x = x;
         this.y = y;
-        this.baseFontSize = Platform.isPC() ? Grid.width / 100 : Grid.width / 50;
+        // this.baseFontSize = Platform.isPC() ? Grid.width / 100 : Grid.width / 50;
+        this.baseFontSize = 12;
         this.dom = this.make(selector);
         this.fontSize = this.baseFontSize;
-        this.fontResize = true;
+        // this.fontResize = true;
+        this.fontResize = false;
         this._objects = {};
         this.lineColor = "#444444";
         this.lineSubColor = "#aaaaaa";
@@ -2622,9 +2624,10 @@ class DataEditor extends DOM{
         return result;
     }
 
-    constructor(selector="body",data=null){
+    constructor(selector="body",data=null,comments=null){
         super(selector);
         this._data = data;
+        this._comments = comments;
         this.result = null;
         this.radioCnt = 0;
         this.is_enable_changekeys = false;
@@ -2637,6 +2640,14 @@ class DataEditor extends DOM{
 
     set data(d){
         this._data = typeof(d)==="string" ? JSON.parse(d) : d;
+    }
+
+    get comments(){
+        return this._comments;
+    }
+
+    set comments(d){
+        this._comments = typeof(d)==="string" ? JSON.parse(d) : d;
     }
 
     stringify(){
@@ -2723,35 +2734,43 @@ class DataEditor extends DOM{
         return elm;
     }
 
-    search_form_by_key(key="key"){
-        const items = this.contents.querySelectorAll(".jef-item");
+    search_form_by_key(key="key",contents=null){
+        if(contents===null){
+            contents = this.contents;
+        }
+        const items = contents.querySelectorAll(":scope > .jef-object > .jef-item");
+        // console.log("items",items);
         for(let item of items){
             const k = item.querySelector(":scope > .jef-key");
-            if(k.textContent === key){
+            // console.log(k,k.textContent,key,k.textContent === key);
+            if(k && k.textContent === key){
                 return item;
             }
         }
         return null;
     }
 
-    search_comment_by_key(key="key"){
-        const item = this.search_form_by_key(key);
+    search_comment_by_key(key="key",contents=null){
+        const item = this.search_form_by_key(key,contents);
         if(item){
             return item.querySelector(":scope > .jef-come");
         }
         return null;
     }
 
-    search_form_by_index(index=0){
-        const items = this.contents.querySelectorAll(".jef-item");
+    search_form_by_index(index=0,contents=null){
+        if(contents===null){
+            contents = this.contents;
+        }
+        const items = contents.querySelectorAll(":scope > .jef-object > .jef-item");
         if(items && items.length > index){
             return items[index];
         }
         return null;
     }
 
-    search_comment_by_index(index=0){
-        const item = this.search_form_by_index(index);
+    search_comment_by_index(index=0,contents=null){
+        const item = this.search_form_by_index(index,contents);
         if(item){
             return item.querySelector(":scope > .jef-come");
         }
@@ -2816,6 +2835,49 @@ class DataEditor extends DOM{
             }
         }
         return val;
+    }
+
+    form_comment(frame=null,part=null){
+        if(part === null || part === undefined){ return; }
+        if(frame === null || frame === undefined){ return; }
+
+        if(Array.isArray(part)){
+            for(let p of part){
+                for(let key of Object.keys(p)){
+                    let val = p[key];
+                    console.log(key,val);
+                    const item = this.search_form_by_key(key,frame.querySelector(":scope > .jef-array"));
+                    if(item){
+                        const come = this.search_comment_by_key(key,frame.querySelector(":scope > .jef-array"));
+                        if(come){
+                            if(val && typeof(val) === "object"){
+                                come.textContent = val.comment;
+                                this.form_comment(item.querySelector(":scope > .jef-val"),val.dict);
+                            }else{
+                                come.textContent = val;
+                            }
+                        }
+                    }
+                }
+            }
+
+        }else if(typeof(part) === "object"){
+            for(let key of Object.keys(part)){
+                let val = part[key];
+                const item = this.search_form_by_key(key,frame);
+                if(item){
+                    const come = this.search_comment_by_key(key,frame);
+                    if(come){
+                        if(val && typeof(val) === "object"){
+                            come.textContent = val.comment;
+                            this.form_comment(item.querySelector(":scope > .jef-val"),val.dict);
+                        }else{
+                            come.textContent = val;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     form_str(val=""){
@@ -2907,7 +2969,6 @@ class DataEditor extends DOM{
 
         return flag;
     }
-
 
     build(){
         const div = super.build();

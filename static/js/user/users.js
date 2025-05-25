@@ -140,15 +140,15 @@ const je = new DataEditor("#j");
 const jr = new RequestJSON("/user/yaml");
 jr.set_func(function(j){
     console.log(j);
-    je.data = j.data;
-    const comments = j.comments;
+    je.data = j.data.yaml;
+    je.comments = j.data.comments;
     je.build()
-    for(let i=0; i<comments.length; i++){
-        const dom = je.search_comment_by_index(i);
-        if(dom){
-            dom.textContent = comments[i];
-        }
-    }
+    // for(let i=0; i<je.comments.length; i++){
+    //     const dom = je.search_comment_by_index(i);
+    //     if(dom){
+    //         dom.textContent = je.comments[i];
+    //     }
+    // }
 })
 jr.get();
 

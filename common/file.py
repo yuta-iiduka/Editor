@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 # ruamel.yaml      0.18.10
 # ruamel.yaml.clib 0.2.12
 from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 
 class FileData():
@@ -94,35 +95,61 @@ class YamlData(FileData):
 
     def _read(self,file):
         self.data = self.yaml.load(file)
-        # print(self.data)
 
     def _write(self,file):
         self.yaml.dump(self.data, file)
 
-    def get_comment(self,key):
-        # 0:pre → キーの前のコメント
-        # 1:key_comment → キーの上にあるコメント（# のあと）
-        # 2:eol_comment → 行末コメント（← ここ！）
-        # 3:post_comment → 値の後のコメント（次のブロック前など）
-        co = self.data.ca.items[key]
-        if len(co) > 1 and co[2]:
-            return co[2].value.strip()
-        else:
-            return ""
-
     def set_comment(self,key,val):
-        self.data.yaml_add_eol_comment(val, key=key)
+        if self.data.ca.items.get(key):
+            self.data.ca.items[key][2].value = "# {}".format(val)
 
     def get_comments(self,dct=None):
         items = dct
         if dct is None:
-            items = self.data.items()
-        comments = []
-        for k,v in items:
-            comments.append(self.get_comment(k))
-            if type(v) == dict:
-                comments = comments + self.get_comments(v)
+            items = self.data
+        comments = {}
+        for k,v in items.items():
+            comm = self.get_comment(k,items)
+            if isinstance(v, dict):
+                comments[k] = {"comment":comm,"dict":self.get_comments(v)}
+            else:
+                comments[k] = comm
         return comments
+    
+    def get_comment(self,key_or_index,container=None):
+        """CommentedMap や CommentedSeq からコメントを取得"""
+        if container is None:
+            container = self.data
+        if isinstance(container, CommentedMap):
+            if container.ca.items.get(key_or_index):
+                return container.ca.items[key_or_index][2].value.strip()
+        elif isinstance(container, CommentedSeq):
+            # index番目の要素にコメントがあるか確認
+            if container.ca.items.get(key_or_index):
+                return container.ca.items[key_or_index][2].value.strip()
+        return None
+    
+    def array(self,data):
+        arr = []
+        for k,v in data.items():
+            arr.append({k:v})
+        return arr
+
+    def dictionary(self,data):
+        dic = {}
+        for d in data:
+            for k,v in d.items():
+                dic[k] = v
+        return dic
+    
+    def update(self,newdata):
+        if isinstance(newdata,(dict,tuple)):
+            for k,v in newdata.items():
+                self.data[k] = v
+        elif isinstance(newdata,list):
+            cnt = 0
+            for l in newdata:
+                self.data[cnt] = l
         
 class TextData(FileData):
     def __init__(self,file_path):
@@ -203,10 +230,12 @@ if __name__ == "__main__":
     # CSVData("sample.csv")
     # d = XMLData("etc/sample.drawio.xml")
     y = YamlData("etc/sample.yaml")
-    print(y.data)
-    print(y.get_comment("version"))
     print(y.get_comments())
-    # y.set_comment("sample","コメント")
-    # y.write()
+    print(y.get_comment("yyy",y.data["aaa"]))
+    x = dict(sorted(y.data.items(),reverse=False))
+    y.update(x)
+    y.set_comment("sample","コメントaaa")
+    print(y.get_comments())
+    y.write()
     
 
