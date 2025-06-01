@@ -2984,6 +2984,161 @@ class DataEditor extends DOM{
 
 }
 
+class OrderDOM{
+
+    constructor(selector){
+        this.selector = selector;
+        this.dom_list = [];
+        this.active_dom = null;
+        this.update();
+        this.style().build();
+        
+    }
+
+    style(){
+        return new Style(`
+            .order-dom{
+                display:flex;
+                flex-direction:row;
+                align-items: center;
+                gap:8px;
+                padding-left:8px;
+            }
+            .order-dom.group{
+                border-left: 4px solid white;
+                padding-left:4px;
+                background-color:#111111;
+            }
+            .order-dom.group.child{
+                border-left: 2px solid white;
+                padding-left: 6px;
+                background-color:#444444;
+            }
+            .order-btn{
+                display:flex;
+                flex-direction: column;
+            }
+            .up-btn{
+                cursor:pointer;
+            }
+            .down-btn{
+                cursor:pointer;
+            }
+
+        `);
+    }
+
+    up(index){
+        if(index > 0){
+            const id1 = index;
+            const id2 = --index;
+            this.swap(id1,id2);
+            // this.ungroup(id1,id2);
+            this.reset_style();
+        }
+    }
+
+    down(index){
+        if(index < this.dom_list.length){
+            const id1 = index;
+            const id2 = ++index;
+            this.swap(id1,id2);
+            // this.ungroup(id1,id2);
+            this.reset_style();
+        }
+    }
+
+    update(){
+        this.dom_list = document.querySelectorAll(this.selector);
+        let cnt = -1;
+        let startGroup = false;
+        for(let i=0; i<this.dom_list.length; i++){
+            let dom = this.dom_list[i];
+            if(dom.dataset.orderid){
+                dom.dataset.orderid = i;
+            }else{
+                const order_dom = DOM.create("div",{class:"order-dom"});
+                order_dom.addEventListener("mousedown",()=>{
+                    this.active_dom = dom;
+                });
+                dom.parentNode.insertBefore(order_dom,dom);
+                const order_btn = DOM.create("span",{class:"order-btn"});
+                const up_btn = DOM.create("span",{class:"up-btn"});
+                up_btn.textContent = "▲";
+                up_btn.addEventListener("click",()=>{
+                    this.up(this.active_dom.dataset.orderid);
+                });
+                const down_btn = DOM.create("span",{class:"down-btn"});
+                down_btn.textContent = "▼";
+                down_btn.addEventListener("click",()=>{
+                    this.down(this.active_dom.dataset.orderid);
+                });
+
+                order_btn.appendChild(up_btn);
+                order_btn.appendChild(down_btn);
+                order_dom.appendChild(order_btn);
+                order_dom.appendChild(dom);
+                dom.dataset.orderid = i;
+            }
+
+            // TODO groupへ切り替わりを監視し、インクリメントする処理を追加する
+            // TODO お互いの親と子の紐づけ関係を保持しなければならない。（２つ以上の親子セットがある場合）
+            if(dom.parentNode.classList.contains("group") && dom.parentNode.classList.contains("child")){
+                dom.dataset.order = cnt;
+            }else{
+                dom.dataset.order = ++cnt;
+            }
+            
+        }
+        return this.dom_list;
+    }
+
+    swap(id1,id2){
+        console.log(id1,id2);
+        const elem1 = this.dom_list[id1].parentNode;
+        const elem2 = this.dom_list[id2].parentNode;
+        if(elem1 && elem2 && elem1.parentNode){
+            const parent = elem1.parentNode;
+            const nextsibling = elem1.nextSibling;
+            if(nextsibling === elem2){
+                parent.insertBefore(elem2, elem1);
+            }else{
+                parent.insertBefore(elem1, elem2);
+                parent.insertBefore(elem2, nextsibling);
+            }
+        }
+
+        this.update();
+    }
+
+    group(id1,id2){
+        const elem1 = this.dom_list[id1].parentNode;
+        elem1.classList.add("group");
+        const elem2 = this.dom_list[id2].parentNode;
+        elem2.classList.add("group");
+        elem2.classList.add("child");
+        this.update();
+        // this.dom_list[id2].dataset.orderid = this.dom_list[id1].dataset.orderid;
+    }
+    ungroup(id1,id2){
+        const elem1 = this.dom_list[id1].parentNode;
+        elem1.classList.remove("group");
+        elem1.classList.remove("child");
+        const elem2 = this.dom_list[id2].parentNode;
+        elem2.classList.remove("group");
+        elem2.classList.remove("child");
+        this.update();
+    }
+    reset_style(){
+        for(let dom of this.dom_list){
+            dom.parentNode.classList.remove("group");
+            dom.parentNode.classList.remove("child");
+        }
+    }
+
+}
+
+// TODO: Fileアップロード機能
 
 // let f = new Filter();
 //     f.set_condition(
