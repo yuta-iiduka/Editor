@@ -84,6 +84,9 @@ class DOM {
         }else{
             this.parent = selector;
         }
+        if(this.parent === null){
+            console.error("指定されたDOMが見つかりません");
+        }
         this.frame = null;
         this.contents = null;
     }
@@ -3134,6 +3137,232 @@ class OrderDOM{
             dom.parentNode.classList.remove("group");
             dom.parentNode.classList.remove("child");
         }
+    }
+
+}
+
+class FileDrop extends DOM{
+
+    constructor(selector="body"){
+        super(selector);
+        this.post_url = "";
+        this.files = {};
+        this.current_dirpath = "";
+        this.cm = new ConfirmModal();
+    }
+
+    style(){
+        return new Style(`
+            .filedrop-area{
+            
+            }
+            .filedrop-view{
+
+            }
+            .folderdrop-view{
+
+            }
+            .filedrop-input{
+                display:none;
+            }
+            .folderdrop-input{
+                display:none;
+            }
+            .file-record{
+                
+            }
+            .dirpath{
+                border:1px solid white;
+            }
+            .filename{
+                border:1px solid white;
+            }
+        `);
+    }
+
+    post(){
+
+    }
+
+    make(){
+        const elm = super.make();
+        const drop_area = DOM.create("div",{class:"drop-area"});
+        const tree_area = DOM.create("div",{class:"tree-area"});
+        const filedrop_view = DOM.create("div",{class:"filedrop-view"});
+        filedrop_view.textContent = "ファイル選択";
+        filedrop_view.addEventListener("click",function(){
+            filedrop_input.click();
+        });
+        const folderdrop_view = DOM.create("div",{class:"folderdrop-view"});
+        folderdrop_view.textContent = "フォルダ選択";
+        folderdrop_view.addEventListener("click",function(){
+            folderdrop_input.click();
+        });
+        const filedrop_input = DOM.create("input",{class:"filedrop-input"});
+        filedrop_input.type = "file";
+        filedrop_input.setAttribute("multiple","");
+        filedrop_input.addEventListener("change",async (event)=>{
+            await this.load(event);
+            this.draw();
+        });
+
+        const folderdrop_input = DOM.create("input",{class:"folderdrop-input"});
+        folderdrop_input.type = "file";
+        folderdrop_input.setAttribute("webkitdirectory","");
+        folderdrop_input.setAttribute("directory","");
+        folderdrop_input.setAttribute("multiple","");
+        folderdrop_input.addEventListener("change",async (event)=>{
+            await this.load(event);
+            this.draw();
+        });
+
+        elm.appendChild(drop_area);
+        elm.appendChild(tree_area);
+        drop_area.appendChild(filedrop_view);
+        drop_area.appendChild(folderdrop_view);
+        drop_area.appendChild(filedrop_input);
+        drop_area.appendChild(folderdrop_input);
+        this.drop_area = drop_area;
+        this.tree_area = tree_area;
+
+        return elm;
+    }
+
+    async load(event){
+        const current_dirpath = this.current_dirpath;
+        const files = Array.from(event.target.files);
+        console.log('選択されたファイルの総数:', files.length);
+        // ファイル名一覧を表示
+        files.forEach(file => {
+            console.log(file.webkitRelativePath || file.name);
+            // file.text().then(text=>console.log(text));
+            this.files[file.webkitRelativePath || file.name] = file;
+        });
+    }
+
+    get dir(){
+        const dirs = [];
+        for(let fpath of Object.keys(this.files)){
+            // webkitの性質上かならず末尾はファイル
+            const file_path_list = fpath.split("/");
+            const file_name = file_path_list[file_path_list.length-1];
+            const dir_path = file_path_list.length > 1 ? file_path_list.slice(0,file_path_list.length-1).join("/") : "";
+            dirs.push({
+                dirpath:dir_path==="" ? dir_path : `${dir_path}/`,
+                filename:file_name,
+            });
+        }
+        return dirs;
+    }
+
+    current(dirpath=""){
+        const current = {dirnames:[],filenames:[]};
+        for(let d of this.dir){
+            if(d.dirpath === dirpath){
+                current.filenames.push(d.filename);
+            }else if(d.dirpath.includes(dirpath)){
+                const dirname = d.dirpath.replace(dirpath,"").split("/")[0];
+                if(current.dirnames.includes(dirname) === false){
+                    current.dirnames.push(dirname);
+                }
+            }
+        }
+        return current;
+    }
+
+    treeup(dirpath=""){
+        let path = "";
+        if(dirpath==="" || dirpath==="/"){
+            path = "";
+        }else{
+            let dp = dirpath.split("/");
+            path = `${dp.slice(0,dp.length-2).join("/")}/`;
+            path = path==="/" ? "" : path;
+        }
+        return path;
+    }
+
+    draw(){
+        this.tree_area.innerHTML = ""; //一度リセット
+        const tree = DOM.create("div",{class:"current"});
+        const current = this.current(this.current_dirpath);
+        const record = DOM.create("div",{class:"current-record"});
+        const treeup_btn = DOM.create("div",{class:"fd-treeup"});
+        treeup_btn.textContent = "１つ上の階層";
+        treeup_btn.addEventListener("click",()=>{
+            console.log(this.current_dirpath);
+            this.current_dirpath = this.treeup(this.current_dirpath);
+            console.log(this.current_dirpath);
+            this.draw();
+        });
+        const create_btn = DOM.create("div",{class:"fd-create"});
+        create_btn.textContent = "フォルダ追加";
+        create_btn.addEventListener("click",async ()=>{
+            let newdir = ""
+            await this.cm.confirm(
+                "<input type='textbox' placeholder='新しいフォルダ名を入力してください'/>",
+                ()=>{
+                    const dirname = this.cm.body.querySelector("input").value;
+                    newdir = this.current_dirpath === "" ? `${dirname}/` : `${this.current_dirpath}${dirname}/`;
+                    console.log(newdir);
+                    this.files[newdir] = null;
+                    this.draw();
+                }
+            );
+            
+        });
+
+        for(let d of current.dirnames){
+            const dirrecord = record.cloneNode();
+            const name = DOM.create("span",{class:"dir-name"});
+            name.textContent = d;
+            name.addEventListener("click",()=>{
+                this.current_dirpath = this.current_dirpath === "" ? `${d}/` : `${this.current_dirpath}${d}/`;
+                this.draw();
+            }); 
+            const btns = DOM.create("span",{class:"fd-btns"});
+            const detail_btn = DOM.create("span",{class:"fd-detail"});
+            detail_btn.textContent = "詳細";
+            const delete_btn = DOM.create("span",{class:"fd-delete"});
+            delete_btn.textContent = "削除";
+            const update_btn = DOM.create("span",{class:"fd-update"});
+            update_btn.textContent = "更新";
+            btns.appendChild(detail_btn);
+            btns.appendChild(delete_btn);
+            btns.appendChild(update_btn);
+            dirrecord.appendChild(name);
+            dirrecord.appendChild(btns);
+            tree.appendChild(dirrecord);
+        }
+
+        for(let f of current.filenames){
+            const dirrecord = record.cloneNode();
+            const name = DOM.create("span",{class:"dir-name"});
+            name.textContent = f;
+            const btns = DOM.create("span",{class:"fd-btns"});
+            const detail_btn = DOM.create("span",{class:"fd-detail"});
+            detail_btn.textContent = "詳細";
+            const delete_btn = DOM.create("span",{class:"fd-delete"});
+            delete_btn.textContent = "削除";
+            const update_btn = DOM.create("span",{class:"fd-update"});
+            update_btn.textContent = "更新";
+            btns.appendChild(detail_btn);
+            btns.appendChild(delete_btn);
+            btns.appendChild(update_btn);
+            dirrecord.appendChild(name);
+            dirrecord.appendChild(btns);
+            tree.appendChild(dirrecord);
+        }
+
+        this.tree_area.appendChild(treeup_btn);
+        this.tree_area.appendChild(create_btn);
+        this.tree_area.appendChild(tree);
+    }
+
+    build(){
+        super.build();
+        this.style().build();
+        this.draw();
     }
 
 }

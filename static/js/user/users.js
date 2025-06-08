@@ -137,20 +137,20 @@ const je = new DataEditor("#j");
 // ];
 // je.build();
 
-const jr = new RequestJSON("/user/yaml");
-jr.set_func(function(j){
-    console.log(j);
-    je.data = j.data.yaml;
-    je.comments = j.data.comments;
-    je.build()
-    // for(let i=0; i<je.comments.length; i++){
-    //     const dom = je.search_comment_by_index(i);
-    //     if(dom){
-    //         dom.textContent = je.comments[i];
-    //     }
-    // }
-})
-jr.get();
+// const jr = new RequestJSON("/user/yaml");
+// jr.set_func(function(j){
+//     console.log(j);
+//     je.data = j.data.yaml;
+//     je.comments = j.data.comments;
+//     je.build()
+//     // for(let i=0; i<je.comments.length; i++){
+//     //     const dom = je.search_comment_by_index(i);
+//     //     if(dom){
+//     //         dom.textContent = je.comments[i];
+//     //     }
+//     // }
+// })
+// jr.get();
 
 const contextmenu = new ContextMenu("#j");
 contextmenu.append("aaa").append("bbb").append("ccc");
@@ -172,3 +172,6 @@ fetch("/user/download")
 });
 
 const od = new OrderDOM(".xxx .x");
+
+const fd = new FileDrop("#f");
+fd.build();

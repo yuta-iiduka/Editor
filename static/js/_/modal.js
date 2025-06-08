@@ -363,6 +363,47 @@ class Modal{
 
 }
 
+class ConfirmModal extends Modal{
+    constructor(size=Modal.small){
+        super(size);
+        this.result = null;
+        this.resolve = null;
+        this.reject = null;
+        this
+        .set_title("確認")
+        .set_body("")
+        .set_yes_btn(()=>{
+            this.result = true;
+            if(typeof(this.resolve)==="function"){
+                this.resolve();
+                this.resolve = null;
+            }
+        })
+        .set_no_btn(()=>{
+            this.result = false;
+            if(typeof(this.resolve)==="function"){
+                this.reject(new Error("処理を中断しました"));
+                this.reject = null;
+            }
+        })
+    }
+
+    async confirm(message="",func){
+        return new Promise((resolve,reject)=>{
+            this.resolve = resolve;
+            this.reject = reject;
+            this.f = func;
+            this.set_body(message);
+            this.show();    
+        }).then(()=>{
+            if(typeof(this.f)==="function"){
+                this.f();
+            }
+        });
+    }
+
+}
+
 // new Modal()
 //     .set_title("Sample")
 //     .set_body("<div id='btn'>modal</div>")
