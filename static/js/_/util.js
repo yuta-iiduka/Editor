@@ -3149,6 +3149,7 @@ class FileDrop extends DOM{
         this.files = {};
         this.current_dirpath = "";
         this.cm = new ConfirmModal();
+        this.dmdl = new Modal().set_no_btn(()=>{},"閉じる");
         this.data = null;
         this.previewfile = null; 
     }
@@ -3195,11 +3196,35 @@ class FileDrop extends DOM{
             .file-tool{
                 display:flex;
             }
+            .dir-name{
+                cursor:pointer;
+            }
+            .file-name{
+                cursor:pointer;
+            }
+            .fd-icon{
+                width:16px;
+                height:16px;
+            }
             .fd-treeup{
                 display:inline-block;
+                cursor:pointer;
             }
             .fd-create{
                 display:inline-block;
+                cursor:pointer;
+            }
+            .fd-detail{
+                cursor:pointer;
+            }
+            .fd-delete{
+                cursor:pointer;
+            }
+            .fd-update{
+                cursor:pointer;
+            }
+            .fd-preview{
+                overflow:auto;
             }
         `);
     }
@@ -3208,26 +3233,63 @@ class FileDrop extends DOM{
         // サーバへファイルを送信
     }
 
-    get(){
+    get(url,filepath="filename"){
         // サーバからファイルを取得
+        let file = null;
+        fetch(url) //"/user/download"
+        .then(response => response.blob())
+        .then(blob=>{
+            file = new File([blob], this.filename(filepath), {type:blob.type});
+            this.files[filepath] = file
+            console.log(file);
+            new Promise((resolve)=>{
+                const reader = new FileReader();
+                reader.onload = () => resolve(f);
+                return //reader.readAsText(file);
+            });
+        });
+    }
+
+    filename(filepath=""){
+        const separated_list = filepath.split("/");
+        return separated_list.length <= 1 ? filepath : filepath.split("/")[separated_list.length - 1];
     }
 
     read(file){
-        const reader = new FileReader();
-        reader.onload = () => {
-            this.data = reader.result;
-            this.previewfile = file;
-        }
-        reader.readAsText(file);
+        return new Promise((resolve)=>{
+            const reader = new FileReader();
+            reader.onload = () => {
+                this.data = reader.result;
+                this.previewfile = file;
+                this.preview = this.analize(file);
+                resolve();
+            }
+            if(file.name.includes(".png") || file.name.includes(".jpg") || file.name.includes(".gif")){
+                reader.readAsDataURL(file);
+            }else if(file.name.includes(".xlsx")){
+                reader.readAsArrayBuffer(file);
+            }else{
+                reader.readAsText(file);
+            }
+        });
     }
 
-    preview(file){
+    analize(file){
         const type = file.type;
+        let dom = null;
         if(type.startsWith("text/")){
-
+            dom = DOM.create("pre",{class:"fd-preview"});
+            dom.textContent = this.data;
         }else if(type.startsWith("image/")){
-
+            // 画像データの作成
+            dom = DOM.create("img",{class:"fd-preview"});
+            dom.src = this.data;
+            dom.style.width = "100%";
+        }else{
+            dom = DOM.create("div");
+            dom.textContent = "プレビューに対応していません";
         }
+        return dom;
     }
 
     download(file) {
@@ -3302,6 +3364,8 @@ class FileDrop extends DOM{
         file_tool.appendChild(folderdrop_input);
         this.drop_area = drop_area;
         this.tree_area = tree_area;
+        this.folderdrop_input = folderdrop_input;
+        this.filedrop_input = filedrop_input;
 
         return elm;
     }
@@ -3439,6 +3503,9 @@ class FileDrop extends DOM{
             
         });
 
+        const path_info = DOM.create("div",{class:"path-info"});
+        path_info.textContent = this.current_dirpath;
+
         for(let d of current.dirnames){
             const dirrecord = record.cloneNode();
             const name = DOM.create("span",{class:"dir-name"});
@@ -3446,17 +3513,28 @@ class FileDrop extends DOM{
             name.addEventListener("click",()=>{
                 this.current_dirpath = this.current_dirpath === "" ? `${d}/` : `${this.current_dirpath}${d}/`;
                 this.draw();
-            }); 
+                path_info.textContent = this.current_dirpath;
+            });
+            const icon = DOM.create("img",{class:"fd-icon"});
+            icon.src = "/static/img/_/icon_file.png"; 
             const btns = DOM.create("span",{class:"fd-btns"});
-            const detail_btn = DOM.create("span",{class:"fd-detail"});
-            detail_btn.textContent = "詳細";
+            // const detail_btn = DOM.create("span",{class:"fd-detail"});
+            // detail_btn.textContent = "詳細";
             const delete_btn = DOM.create("span",{class:"fd-delete"});
             delete_btn.textContent = "削除";
+            delete_btn.addEventListener("click",()=>{
+                dirrecord.remove();
+                // TODO:それ以下のフォルダ・ファイルを削除
+            });
             const update_btn = DOM.create("span",{class:"fd-update"});
             update_btn.textContent = "更新";
-            btns.appendChild(detail_btn);
+            update_btn.addEventListener("click",async (e)=>{
+                // TODO:名前の変更
+            })
+            // btns.appendChild(detail_btn);
             btns.appendChild(delete_btn);
             btns.appendChild(update_btn);
+            dirrecord.appendChild(icon);
             dirrecord.appendChild(name);
             dirrecord.appendChild(btns);
             tree.appendChild(dirrecord);
@@ -3464,18 +3542,38 @@ class FileDrop extends DOM{
 
         for(let f of current.filenames){
             const dirrecord = record.cloneNode();
-            const name = DOM.create("span",{class:"dir-name"});
+            const icon = DOM.create("img",{class:"fd-icon"}); 
+            icon.src = "/static/img/_/icon_folder.png"; 
+            const name = DOM.create("span",{class:"file-name"});
             name.textContent = f;
+            name.addEventListener("click",async ()=>{
+                await this.read(this.files[this.current_dirpath + f]);
+                this.dmdl.set_body(this.preview);
+                this.dmdl.show();
+            });
             const btns = DOM.create("span",{class:"fd-btns"});
             const detail_btn = DOM.create("span",{class:"fd-detail"});
             detail_btn.textContent = "詳細";
+            detail_btn.addEventListener("click",async ()=>{
+                await this.read(this.files[this.current_dirpath + f]);
+                this.dmdl.set_body(this.preview);
+                this.dmdl.show();
+            });
             const delete_btn = DOM.create("span",{class:"fd-delete"});
             delete_btn.textContent = "削除";
+            delete_btn.addEventListener("click",()=>{
+                dirrecord.remove();
+                // TODO:それ以下のフォルダ・ファイルを削除
+            });
             const update_btn = DOM.create("span",{class:"fd-update"});
             update_btn.textContent = "更新";
+            delete_btn.addEventListener("click",()=>{
+                // TODO:名前の変更
+            });
             btns.appendChild(detail_btn);
             btns.appendChild(delete_btn);
             btns.appendChild(update_btn);
+            dirrecord.appendChild(icon);
             dirrecord.appendChild(name);
             dirrecord.appendChild(btns);
             tree.appendChild(dirrecord);

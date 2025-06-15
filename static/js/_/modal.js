@@ -302,7 +302,12 @@ class Modal{
         return this;
     }
     set_body(html){
-        this.body.innerHTML = html;
+        if(typeof(html)==="string"){
+            this.body.innerHTML = html;
+        }else{
+            this.body.innerHTML = "";
+            this.body.appendChild(html);
+        }
         return this;
     }
 
