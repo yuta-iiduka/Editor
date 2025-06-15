@@ -3149,6 +3149,8 @@ class FileDrop extends DOM{
         this.files = {};
         this.current_dirpath = "";
         this.cm = new ConfirmModal();
+        this.data = null;
+        this.previewfile = null; 
     }
 
     style(){
@@ -3177,24 +3179,100 @@ class FileDrop extends DOM{
             .filename{
                 border:1px solid white;
             }
+            .filedrop{
+                background-color: black;
+                color: white;
+                height:100%;
+                width:100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;                
+            }
+            .filedrop.active{
+                background-color: grey;
+            }
+            .file-tool{
+                display:flex;
+            }
+            .fd-treeup{
+                display:inline-block;
+            }
+            .fd-create{
+                display:inline-block;
+            }
         `);
     }
 
     post(){
+        // サーバへファイルを送信
+    }
 
+    get(){
+        // サーバからファイルを取得
+    }
+
+    read(file){
+        const reader = new FileReader();
+        reader.onload = () => {
+            this.data = reader.result;
+            this.previewfile = file;
+        }
+        reader.readAsText(file);
+    }
+
+    preview(file){
+        const type = file.type;
+        if(type.startsWith("text/")){
+
+        }else if(type.startsWith("image/")){
+
+        }
+    }
+
+    download(file) {
+        // File からオブジェクトURLを作成
+        const url = URL.createObjectURL(file);
+        // 一時的な <a> 要素を作成
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name; // ダウンロード時のファイル名を設定
+        document.body.appendChild(a); // Firefox 対策でDOMに追加
+        a.click(); // 自動的にクリック
+        document.body.removeChild(a); // 後片付け
+        URL.revokeObjectURL(url); // メモリ解放
     }
 
     make(){
         const elm = super.make();
+        elm.addEventListener("dragover",(e)=>{
+            e.preventDefault();
+            elm.classList.add("active");
+        });
+        elm.addEventListener("dragleave",(e)=>{
+            elm.classList.remove("active");
+        });
+        elm.addEventListener("drop",async (e)=>{
+            e.preventDefault();
+            await this.dropload(e);
+            this.draw();
+            elm.classList.remove("active");
+        });
+        elm.classList.add("filedrop");
+        const file_tool = DOM.create("div",{class:"file-tool"});
         const drop_area = DOM.create("div",{class:"drop-area"});
         const tree_area = DOM.create("div",{class:"tree-area"});
         const filedrop_view = DOM.create("div",{class:"filedrop-view"});
         filedrop_view.textContent = "ファイル選択";
+        filedrop_view.style.paddingLeft = "10px";
+        filedrop_view.style.cursor = "pointer";
         filedrop_view.addEventListener("click",function(){
             filedrop_input.click();
         });
         const folderdrop_view = DOM.create("div",{class:"folderdrop-view"});
         folderdrop_view.textContent = "フォルダ選択";
+        folderdrop_view.style.paddingLeft = "10px";
+        folderdrop_view.style.cursor = "pointer";
         folderdrop_view.addEventListener("click",function(){
             folderdrop_input.click();
         });
@@ -3205,7 +3283,6 @@ class FileDrop extends DOM{
             await this.load(event);
             this.draw();
         });
-
         const folderdrop_input = DOM.create("input",{class:"folderdrop-input"});
         folderdrop_input.type = "file";
         folderdrop_input.setAttribute("webkitdirectory","");
@@ -3216,27 +3293,72 @@ class FileDrop extends DOM{
             this.draw();
         });
 
+        elm.appendChild(file_tool);
         elm.appendChild(drop_area);
         elm.appendChild(tree_area);
-        drop_area.appendChild(filedrop_view);
-        drop_area.appendChild(folderdrop_view);
-        drop_area.appendChild(filedrop_input);
-        drop_area.appendChild(folderdrop_input);
+        file_tool.appendChild(filedrop_view);
+        file_tool.appendChild(folderdrop_view);
+        file_tool.appendChild(filedrop_input);
+        file_tool.appendChild(folderdrop_input);
         this.drop_area = drop_area;
         this.tree_area = tree_area;
 
         return elm;
     }
 
+    async dropload(event){
+        event.preventDefault();
+        const items = event.dataTransfer.items;
+        let i = 0;
+        for(const item of items){
+            i++;
+            const entry = item.webkitGetAsEntry();
+            if(entry){
+                this.traverse_file_tree(entry);
+                // await this.traverse_file_tree(entry);
+            }
+            console.log(item);
+        }
+        console.log('選択されたファイルの総数:', i, items);
+
+    }
+
+    async traverse_file_tree(entry,path=""){
+        if(entry.isFile){
+            await new Promise((resolve)=>{
+                entry.file((file)=>{
+                    console.log(path,file.name);
+                    this.files[this.current_dirpath + path + file.name] = file;
+                    this.draw();
+                    resolve();
+                });
+            })
+        }else if(entry.isDirectory){
+            const reader = entry.createReader();
+            const readEntries = () => {
+                return new Promise((resolve) => {
+                    reader.readEntries(resolve);
+                });
+            };
+
+            let entries;
+            do{
+                entries = await readEntries();
+                for(const e of entries){
+                    await this.traverse_file_tree(e, path + entry.name + "/");
+                }
+            }while(entries.length > 0)
+        }
+    }
+
     async load(event){
-        const current_dirpath = this.current_dirpath;
         const files = Array.from(event.target.files);
         console.log('選択されたファイルの総数:', files.length);
         // ファイル名一覧を表示
         files.forEach(file => {
             console.log(file.webkitRelativePath || file.name);
             // file.text().then(text=>console.log(text));
-            this.files[file.webkitRelativePath || file.name] = file;
+            this.files[`${this.current_dirpath}${file.webkitRelativePath || file.name}`] = file;
         });
     }
 
@@ -3289,6 +3411,8 @@ class FileDrop extends DOM{
         const record = DOM.create("div",{class:"current-record"});
         const treeup_btn = DOM.create("div",{class:"fd-treeup"});
         treeup_btn.textContent = "１つ上の階層";
+        treeup_btn.style.paddingLeft = "10px";
+        treeup_btn.style.cursor = "pointer";
         treeup_btn.addEventListener("click",()=>{
             console.log(this.current_dirpath);
             this.current_dirpath = this.treeup(this.current_dirpath);
@@ -3297,6 +3421,9 @@ class FileDrop extends DOM{
         });
         const create_btn = DOM.create("div",{class:"fd-create"});
         create_btn.textContent = "フォルダ追加";
+        create_btn.style.paddingLeft = "10px";
+        create_btn.style.cursor = "pointer";
+
         create_btn.addEventListener("click",async ()=>{
             let newdir = ""
             await this.cm.confirm(
