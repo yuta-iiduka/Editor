@@ -68,6 +68,7 @@ class Modal{
             }
             .modal_body{
                 height: calc(100% - 48px);
+                overflow-y: auto;
             }
             .modal_foot{
                 display: flex;
@@ -402,8 +403,9 @@ class ConfirmModal extends Modal{
             this.show();    
         }).then(()=>{
             if(typeof(this.f)==="function"){
-                this.f();
+                return this.f();
             }
+            return null;
         });
     }
 

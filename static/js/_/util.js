@@ -3174,6 +3174,11 @@ class FileDrop extends DOM{
             .file-record{
                 
             }
+            .current-record{
+                display: flex;
+                align-items: center;
+                padding: 4px;
+            }
             .dirpath{
                 border:1px solid white;
             }
@@ -3198,9 +3203,15 @@ class FileDrop extends DOM{
             }
             .dir-name{
                 cursor:pointer;
+                padding:4px;
             }
             .file-name{
                 cursor:pointer;
+                padding:4px;
+            }
+            .tree-area{
+                height:100%;
+                overflow-y:auto;
             }
             .fd-icon{
                 width:16px;
@@ -3322,7 +3333,6 @@ class FileDrop extends DOM{
         });
         elm.classList.add("filedrop");
         const file_tool = DOM.create("div",{class:"file-tool"});
-        const drop_area = DOM.create("div",{class:"drop-area"});
         const tree_area = DOM.create("div",{class:"tree-area"});
         const filedrop_view = DOM.create("div",{class:"filedrop-view"});
         filedrop_view.textContent = "ファイル選択";
@@ -3356,13 +3366,11 @@ class FileDrop extends DOM{
         });
 
         elm.appendChild(file_tool);
-        elm.appendChild(drop_area);
         elm.appendChild(tree_area);
         file_tool.appendChild(filedrop_view);
         file_tool.appendChild(folderdrop_view);
         file_tool.appendChild(filedrop_input);
         file_tool.appendChild(folderdrop_input);
-        this.drop_area = drop_area;
         this.tree_area = tree_area;
         this.folderdrop_input = folderdrop_input;
         this.filedrop_input = filedrop_input;
@@ -3469,6 +3477,7 @@ class FileDrop extends DOM{
     }
 
     draw(){
+        // TODO: 右クリックメニュー
         this.tree_area.innerHTML = ""; //一度リセット
         const tree = DOM.create("div",{class:"current"});
         const current = this.current(this.current_dirpath);
@@ -3490,17 +3499,21 @@ class FileDrop extends DOM{
 
         create_btn.addEventListener("click",async ()=>{
             let newdir = ""
-            await this.cm.confirm(
+            const dirname = await this.cm.confirm(
                 "<input type='textbox' placeholder='新しいフォルダ名を入力してください'/>",
                 ()=>{
-                    const dirname = this.cm.body.querySelector("input").value;
-                    newdir = this.current_dirpath === "" ? `${dirname}/` : `${this.current_dirpath}${dirname}/`;
-                    console.log(newdir);
-                    this.files[newdir] = null;
-                    this.draw();
+                    return this.cm.body.querySelector("input").value;
                 }
             );
-            
+            if(dirname === "" || dirname === null){
+                return;
+            }else{
+                newdir = this.current_dirpath === "" ? `${dirname}/` : `${this.current_dirpath}${dirname}/`;
+                console.log(newdir);
+                this.files[newdir] = null;
+                this.draw();
+                return;
+            }
         });
 
         const path_info = DOM.create("div",{class:"path-info"});
@@ -3520,16 +3533,42 @@ class FileDrop extends DOM{
             const btns = DOM.create("span",{class:"fd-btns"});
             // const detail_btn = DOM.create("span",{class:"fd-detail"});
             // detail_btn.textContent = "詳細";
-            const delete_btn = DOM.create("span",{class:"fd-delete"});
+            const delete_btn = DOM.create("button",{class:"fd-delete"});
             delete_btn.textContent = "削除";
             delete_btn.addEventListener("click",()=>{
-                dirrecord.remove();
-                // TODO:それ以下のフォルダ・ファイルを削除
+                // それ以下のフォルダ・ファイルを削除
+                const fps = Object.keys(this.files);
+                const tmp_files = {};
+                for(let fp of fps){
+                    if(fp.startsWith(`${this.current_dirpath}${d}`) === false){
+                        tmp_files[fp] = this.files[fp];
+                    }
+                }
+                this.files = tmp_files;
+                this.draw();
             });
-            const update_btn = DOM.create("span",{class:"fd-update"});
+            const update_btn = DOM.create("button",{class:"fd-update"});
             update_btn.textContent = "更新";
             update_btn.addEventListener("click",async (e)=>{
-                // TODO:名前の変更
+                // 名前の変更
+                const base_dir = this.files[this.current_dirpath + d]
+                const newdir_name = await this.cm.confirm(
+                    `<input type="textbox" placeholder="変更後の名前を入力してください" value="${d}"/>`,
+                    ()=>{return this.cm.body.querySelector("input").value }
+                );
+                const fps = Object.keys(this.files);
+                const tmp_files = {};
+                for(let fp of fps){
+                    if(fp.startsWith(`${this.current_dirpath}${d}`) === false){
+                        tmp_files[fp] = this.files[fp];
+                    }else{
+                        const newfile_path = fp.replace(`${this.current_dirpath}${d}`,`${this.current_dirpath}${newdir_name}`);
+                        tmp_files[newfile_path] = this.files[fp];
+                    }
+                }
+                this.files = tmp_files;
+                this.draw();
+
             })
             // btns.appendChild(detail_btn);
             btns.appendChild(delete_btn);
@@ -3552,23 +3591,39 @@ class FileDrop extends DOM{
                 this.dmdl.show();
             });
             const btns = DOM.create("span",{class:"fd-btns"});
-            const detail_btn = DOM.create("span",{class:"fd-detail"});
+            const detail_btn = DOM.create("button",{class:"fd-detail"});
             detail_btn.textContent = "詳細";
             detail_btn.addEventListener("click",async ()=>{
                 await this.read(this.files[this.current_dirpath + f]);
                 this.dmdl.set_body(this.preview);
                 this.dmdl.show();
             });
-            const delete_btn = DOM.create("span",{class:"fd-delete"});
+            const delete_btn = DOM.create("button",{class:"fd-delete"});
             delete_btn.textContent = "削除";
             delete_btn.addEventListener("click",()=>{
                 dirrecord.remove();
-                // TODO:それ以下のフォルダ・ファイルを削除
+                // ファイルを削除
+                delete this.files[this.current_dirpath + f];
+                this.draw();
             });
-            const update_btn = DOM.create("span",{class:"fd-update"});
+            const update_btn = DOM.create("button",{class:"fd-update"});
             update_btn.textContent = "更新";
-            delete_btn.addEventListener("click",()=>{
-                // TODO:名前の変更
+            update_btn.addEventListener("click",async ()=>{
+                // 名前の更新
+                const base_file = this.files[this.current_dirpath + f]
+                const newfile_name = await this.cm.confirm(
+                    `<input type="textbox" placeholder="変更後の名前を入力してください" value="${base_file.name}"/>`,
+                    ()=>{return this.cm.body.querySelector("input").value }
+                );
+                console.log(newfile_name);
+                const new_file = new File([base_file], newfile_name, {
+                    type: base_file.type,
+                    lastModified: base_file.lastModified,
+                });
+
+                this.files[this.current_dirpath + newfile_name] = new_file;
+                delete this.files[this.current_dirpath + f];
+                this.draw();
             });
             btns.appendChild(detail_btn);
             btns.appendChild(delete_btn);
@@ -3591,8 +3646,6 @@ class FileDrop extends DOM{
     }
 
 }
-
-// TODO: Fileアップロード機能
 
 // let f = new Filter();
 //     f.set_condition(
