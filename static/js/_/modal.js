@@ -394,12 +394,11 @@ class ConfirmModal extends Modal{
         })
     }
 
-    async confirm(message="",func){
+    async confirm(func){
         return new Promise((resolve,reject)=>{
             this.resolve = resolve;
             this.reject = reject;
             this.f = func;
-            this.set_body(message);
             this.show();    
         }).then(()=>{
             if(typeof(this.f)==="function"){
@@ -409,6 +408,30 @@ class ConfirmModal extends Modal{
         });
     }
 
+}
+
+class ErrorModal extends Modal{
+    constructor(message=""){
+        super();
+        this.message = message;
+        this
+        .set_title("エラー")
+        .set_body(this.message_html())
+        .set_yes_btn(()=>{},"閉じる");
+    }
+
+    message_html(message=""){
+        if(message===""){
+            return `<div id="modal-message${this.id}" class="modal-error-message">${this.message}</div>`;
+        }else{
+            return `<div id="modal-message${this.id}" class="modal-error-message">${message}</div>`;
+        }
+    }
+
+    show(message=""){
+        this.set_body(this.message_html(message));
+        super.show();
+    }
 }
 
 // new Modal()

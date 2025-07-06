@@ -2585,6 +2585,7 @@ class ContextMenu extends DOM{
     event(){
         this.parent.addEventListener("contextmenu",(e)=>{
             e.preventDefault();
+            e.stopPropagation();
             console.log(e.target);
             this.show(this.autoX(e.pageX),this.autoY(e.pageY));
         });
@@ -3150,12 +3151,16 @@ class FileDrop extends DOM{
         this.current_dirpath = "";
         this.cm = new ConfirmModal();
         this.dmdl = new Modal().set_no_btn(()=>{},"閉じる");
+        this.emdl = new ErrorModal();
         this.data = null;
         this.previewfile = null; 
     }
 
     style(){
         return new Style(`
+            .frame-${this.type()}{
+                height:100%;
+            }
             .filedrop-area{
             
             }
@@ -3193,7 +3198,8 @@ class FileDrop extends DOM{
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
-                align-items: center;                
+                align-items: center;
+                overflow-y: auto;
             }
             .filedrop.active{
                 background-color: grey;
@@ -3496,14 +3502,11 @@ class FileDrop extends DOM{
         create_btn.textContent = "フォルダ追加";
         create_btn.style.paddingLeft = "10px";
         create_btn.style.cursor = "pointer";
-
         create_btn.addEventListener("click",async ()=>{
             let newdir = ""
+            this.com.set_body("<input type='textbox' placeholder='新しいフォルダ名を入力してください'/>");
             const dirname = await this.cm.confirm(
-                "<input type='textbox' placeholder='新しいフォルダ名を入力してください'/>",
-                ()=>{
-                    return this.cm.body.querySelector("input").value;
-                }
+                ()=>{return this.cm.body.querySelector("input").value;}
             );
             if(dirname === "" || dirname === null){
                 return;
@@ -3552,11 +3555,15 @@ class FileDrop extends DOM{
             update_btn.addEventListener("click",async (e)=>{
                 // 名前の変更
                 const base_dir = this.files[this.current_dirpath + d]
+                this.cm.set_title(d).set_body(`<input type="textbox" placeholder="変更後の名前を入力してください" value="${d}"/>`);
                 const newdir_name = await this.cm.confirm(
-                    `<input type="textbox" placeholder="変更後の名前を入力してください" value="${d}"/>`,
                     ()=>{return this.cm.body.querySelector("input").value }
                 );
                 const fps = Object.keys(this.files);
+                if(fps.some(fp => fp.startsWith(`${this.current_dirpath}${newdir_name}`))){
+                    this.emdl.show("フォルダ名が重複しています。");
+                    return;
+                }
                 const tmp_files = {};
                 for(let fp of fps){
                     if(fp.startsWith(`${this.current_dirpath}${d}`) === false){
@@ -3568,7 +3575,6 @@ class FileDrop extends DOM{
                 }
                 this.files = tmp_files;
                 this.draw();
-
             })
             // btns.appendChild(detail_btn);
             btns.appendChild(delete_btn);
@@ -3611,11 +3617,14 @@ class FileDrop extends DOM{
             update_btn.addEventListener("click",async ()=>{
                 // 名前の更新
                 const base_file = this.files[this.current_dirpath + f]
+                this.cm.set_title(f).set_body(`<input type="textbox" placeholder="変更後の名前を入力してください" value="${base_file.name}"/>`);
                 const newfile_name = await this.cm.confirm(
-                    `<input type="textbox" placeholder="変更後の名前を入力してください" value="${base_file.name}"/>`,
                     ()=>{return this.cm.body.querySelector("input").value }
                 );
-                console.log(newfile_name);
+                if(Object.keys(this.files).includes(`${this.current_dirpath}${newfile_name}`)){
+                    this.emdl.show("ファイル名が重複しています。");
+                    return;
+                }
                 const new_file = new File([base_file], newfile_name, {
                     type: base_file.type,
                     lastModified: base_file.lastModified,

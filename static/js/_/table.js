@@ -137,10 +137,12 @@ class Table extends DOM{
         this.is_update = false;
         this.is_reload = false;
         this.is_request = false;
+        this.is_swapable = false;
 
         this.active_filterable = true;
         this.active_sortable = true;
         this.active_paginate = true;
+        this.active_tr = null;
 
         this.click_th = null;
         this.click_tr = null;
@@ -177,7 +179,7 @@ class Table extends DOM{
     }
 
     get rid(){
-        return this._rid++;
+        return this._rid;
     }
 
     set rid(i){
@@ -257,12 +259,13 @@ class Table extends DOM{
 
     set data(data){
         try{
+            this.rid = 0;
             if(data !== null && data !== undefined && data.length !== undefined){
                 for(let d of data){
                     if( Object.keys(d).includes("dataset")){
-                        d.dataset.rid = this.rid;
+                        d.dataset.rid = this.rid++;
                     }else{
-                        d.dataset = {"rid":this.rid};
+                        d.dataset = {"rid":this.rid++};
                     }
                 }
             }
@@ -437,6 +440,7 @@ class Table extends DOM{
         }
 
         tr.addEventListener("click",function(){
+            self.active_tr = tr;
             if(typeof(self.click_tr) === "function"){
                 self.click_tr(tr);
             }
@@ -457,6 +461,30 @@ class Table extends DOM{
             trs.push(this.insert(row));
         }
         return trs;
+    }
+
+    up(tr){
+        if(tr === null){ return; }
+        const trid = this.data.findIndex(r=> r.dataset.rid == tr.dataset.rid);
+        // 境界チェック（trid > 0 であることが必要）
+        if (trid > 0 && trid < this.data.length) {
+        // 入れ替え
+        [this.data[trid - 1], this.data[trid]] = [this.data[trid], this.data[trid - 1]];
+        }
+        //ソート条件無くさないと、結局並べ替えてしまうので無効化
+        this.so = null; 
+        this.draw(false);
+    }
+
+    down(tr){
+        const trid = this.data.findIndex(r=> r.dataset.rid == tr.dataset.rid);
+        // 境界チェック：nが最後の要素ではないこと
+        if (trid >= 0 && trid < this.data.length - 1) {
+        [this.data[trid], this.data[trid + 1]] = [this.data[trid + 1], this.data[trid]];
+        }
+        //ソート条件無くさないと、結局並べ替えてしまうので無効化
+        this.so = null; 
+        this.draw(false);
     }
 
     /**
@@ -512,7 +540,20 @@ class Table extends DOM{
         // 画面遷移を伴わない通信でデータを取得する場合
         // 初期化時にソートリクエストを送る
         const rj = new RequestJSON(get_url);
-        rj.set_func((d)=>{this.data=d;});
+        rj.set_func((d)=>{
+            const rows = [];
+            for(let c of d){
+                const r = {};
+                for(let k of this.columns){
+                    let v = c[k.field];
+                    if(v === null || v === undefined){ v = ""}
+                    r[k.field] = v;
+                }
+                rows.push(r);
+            }
+            this.data=rows;
+            this.draw(false);
+        });
         rj.set_error_func((d)=>{alert(d)})
         rj.get();
         // rj.fetchGet(get);
@@ -752,21 +793,23 @@ class TableBuilder extends Table{
     /**
      * レコードの描画やその操作UIの描画
      */
-    draw(){
+    draw(request=true){
         this.body.innerHTML = "";
         this.rows = this.data;
 
-        // データの部分更新を伴う場合
-        if(this.is_update === true){
-            this.fetch(this.url);
+        // データ更新を伴う場合
+        if(request === true){
+            // データの部分更新を伴う場合
+            if(this.is_update === true){
+                this.fetch(this.url);
 
-        // データリロードを伴う場合
-        }else if(this.is_reload === true){
-            // ビルド前にリロードはしない(無限ループになるため)
-            this.reload();
-            
-        // データ更新を伴わない場合
+            // データリロードを伴う場合
+            }else if(this.is_reload === true){
+                // ビルド前にリロードはしない(無限ループになるため)
+                this.reload();
+            }
         }
+        // データ更新を伴わない場合
 
         if(this.is_filtable){
             if(this.active_filterable){
