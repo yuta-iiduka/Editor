@@ -590,6 +590,8 @@ class Block{
         this._p = {x:this.x,y:this.y,z:this.z,w:this.w,h:this.h};
         this.gap = {x:0,y:0,z:0,w:0,h:0};
         this.laps = [];
+        this.interval = 100;
+        this.lastExecutionTime = Date.now();
         
         // DOM情報
         this.dom = null;
@@ -869,7 +871,13 @@ class Block{
         });
 
         // 中処理
-        document.body.addEventListener("mousemove",function(e){
+        document.body.addEventListener("mousemove", function(e){
+            const now = Date.now();
+            if (now - self.lastExecutionTime < self.interval) {
+                return;
+            }else{
+                self.lastExecutionTime = now;
+            }
             const offset = self.pack.parentElement.getClientRects()[0];
             
             // glovalかlocalで調整
@@ -2388,10 +2396,13 @@ class Scheduler{
 
     constructor(selector="body"){
         this.dom = document.querySelector(selector);
-        this.grid = new GridFixLocal(1440,64,8,64,selector);
+        this.grid = new GridFixLocal(1440,64,128,64,selector);
+        this.dom.style.width  = `${this.grid.w * this.grid.x}px`;
+        this.dom.style.height = `${this.grid.h * this.grid.y}px`;
         this.data = [];
         this.page = [];
         this.active_page = 0;
+        this.active_data = 0;
 
         Scheduler.list.push(this);
     }
@@ -2413,17 +2424,23 @@ class Scheduler{
         return n;
     }
 
-    make(html){
-        const b = new Block(1,1,1,10,1).make(html);
+    make(html,p={x:1,y:1,z:1,w:1,h:1}){
+        const b = new Block(p.x,p.y,p.z,p.w,p.h).make(html);
         this.grid.append(b.id,b);
-        this.data.push(b);
+        if(!this.data[this.active_data]){
+            this.data[this.active_data] = [];
+        }
+        this.data[this.active_data].push(b);
         return this
     }
 
     wrap(selector){
         const b = new Block(1,1,1,10,1).wrap(selector);
         this.grid.append(b.id,b);
-        this.data.push(b);
+        if(!this.data[this.active_data]){
+            this.data[this.active_data] = [];
+        }
+        this.data[this.active_data].push(b);
         return this
     }
 
@@ -2437,8 +2454,8 @@ class Scheduler{
         return this;
     }
 
-    pagenatable(condition={perPage:2,dataLength:this.data.length}){
-        const p = new Pagination(condition,this.data);
+    pagenatable(condition={perPage:this.grid.y,dataLength:this.data[this.active_data].length}){
+        const p = new Pagination(condition,this.data[this.active_data]);
         p.build();
         this.page = p.result;
         return this;
@@ -2449,7 +2466,18 @@ class Scheduler{
         this.draw();
     }
 
+    turn_data(index=0){
+        this.active_data = index;
+        this.pagenatable({perPage:this.grid.y,dataLength:this.data[this.active_data].length});
+        this.draw();
+    }
+
     draw(){
+        for(let k of Object.keys(this.data)){
+            for(let o of this.data[k]){
+                o.visible = false;
+            }
+        }
         for(let i=0; i<this.page.length; i++){
             for(let o of this.page[i]){
                 if(i === this.active_page){
@@ -2463,8 +2491,8 @@ class Scheduler{
     }
 
     build(){
-        this.pagenatable();
-        this.draw();
+        this.turn_data();
+        this.turn_page();
         return this;
     }
 

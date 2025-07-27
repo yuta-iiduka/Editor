@@ -12,7 +12,20 @@ scheduler
 .make("3")
 .make("4")
 .make("5")
-scheduler.build()
+
+async function init_scheduler(){
+    let pro = new Promise((resolve)=>{console.log("start");resolve();})
+    for(let i = 0; i<10; i++){
+        scheduler.active_data = i;
+        pro = new Promise((resolve)=>{
+            for(let d = 0; d<120; d++){
+                scheduler.make(`data ${i}:${d} block`,{x:i,y:d,z:1,w:1,h:1});
+            }
+            resolve();
+        });
+    }
+}
+
 
 const sm = new SideMenu("body",SideMenu.MODE.RIGHT); //b.dom,SideMenu.MODE.RIGHT
 sm.build(document.createTextNode("xxx"));
@@ -38,3 +51,6 @@ async function confirm_modal(){
         console.log(modal.result);
         console.log("confirm end.");
 }
+
+init_scheduler();
+scheduler.build()
