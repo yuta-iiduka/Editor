@@ -277,6 +277,17 @@ class Table extends DOM{
         this._rows = data;
     }
 
+    push(d){
+        for(let d of data){
+            if( Object.keys(d).includes("dataset")){
+                d.dataset.rid = this.rid++;
+            }else{
+                d.dataset = {"rid":this.rid++};
+            }
+        }
+        this._data.push(d);
+    }
+
     /**
      * 各機能の状態に応じて参照されるレコードデータ
      */
@@ -389,6 +400,7 @@ class Table extends DOM{
      * @param {*} tr [{field,value,dataset},...]
      */
     insert(row){
+        console.log(row);
         const tr = document.createElement("tr");
         const self = this;
         if(row.dataset){ 
@@ -542,15 +554,16 @@ class Table extends DOM{
         const rj = new RequestJSON(get_url);
         rj.set_func((d)=>{
             const rows = [];
-            for(let c of d){
+            for(let c of d.data){
                 const r = {};
                 for(let k of this.columns){
                     let v = c[k.field];
-                    if(v === null || v === undefined){ v = ""}
+                    if(v === null || v === undefined){ v = "" }
                     r[k.field] = v;
                 }
                 rows.push(r);
             }
+            this.dl = d.count;
             this.data=rows;
             this.draw(false);
         });
@@ -593,7 +606,8 @@ class Table extends DOM{
      * ページネーション機能
      */
     paginate(){
-        const pagination = new Pagination({perPage:this.pp,dataLength:this.dl},this.rows);
+        console.log("pa",this.pa);
+        const pagination = new Pagination({perPage:this.pp,dataLength:this.dl,activePage:(this.is_update || this.is_reload) ? this.pa : 0},this.rows);
         pagination.build();
         return pagination.result;
     }
@@ -626,6 +640,16 @@ class Table extends DOM{
                 this.draw();
             }
         }
+    }
+
+    /**
+     * テーブル情報を表示する場所
+     * @returns 
+     */
+    ui_info(){
+        const old = document.querySelector(`#ui_info${this.id}`);
+        if(old){old.remove();}
+        return DOM.create("div",{class:"ui_info",id:`ui_info${this.id}`})
     }
 
     /**

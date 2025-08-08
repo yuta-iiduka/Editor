@@ -48,6 +48,10 @@ class DOM {
         })
     }
 
+    static get list(){
+        return Object.values(DOM.dict[this.name.toLowerCase()]);
+    }
+
     /**
      * DOM作成関数
      * @param {*} elm_name 
@@ -2088,18 +2092,28 @@ class Pagination{
         this.result = [];
     }
 
-    check(perPage=10,dataLength=-1){
+    check(perPage=10,dataLength=-1,activePage=-1){
         const result = []
         if(this.data){
             const len = dataLength === -1 ? this.data.length : dataLength;
             let page_data = [];
+            let page_num = 0;
+            let cnt = 0;
             for(let i=0; i<len; i++){
                 if( i % perPage === 0 && i !== 0){
                     result.push(page_data);
                     page_data = [];
+                    page_num++;
                 }
-                page_data.push(this.data[i]);
-                
+                if( activePage === -1){
+                    if(this.data[cnt]){
+                        page_data.push(this.data[cnt++]);
+                    }
+                }else if(activePage === page_num){
+                    if(this.data[cnt]){
+                        page_data.push(this.data[cnt++]);
+                    }
+                }
             }
             result.push(page_data)
         }
@@ -2108,10 +2122,11 @@ class Pagination{
 
     build(){
         if(this.condition){
-            const perPage = this.condition.perPage
-            const dataLength = this.condition.dataLength
+            const perPage = this.condition.perPage;
+            const dataLength = this.condition.dataLength;
+            const activePage = this.condition.activePage;
             if(dataLength){
-                this.result = this.check(perPage,dataLength);
+                this.result = this.check(perPage,dataLength,activePage);
             }else{
                 this.result = this.check(perPage);
             }
@@ -2297,7 +2312,13 @@ class SideMenu extends DOM {
 
 class TabPage extends DOM{
 
-    static list = [];
+    // static list = [];
+
+    static trun_page(index=0){
+        for(let tp of TabPage.list){
+            tp.turn_page(index);
+        }
+    }
 
     constructor(selector){
         super(selector);
@@ -3670,7 +3691,7 @@ class FileDrop extends DOM{
             dirrecord.appendChild(btns);
             tree.appendChild(dirrecord);
         }
-
+        this.tree_area.appendChild(path_info);
         this.tree_area.appendChild(treeup_btn);
         this.tree_area.appendChild(create_btn);
         this.tree_area.appendChild(tree);

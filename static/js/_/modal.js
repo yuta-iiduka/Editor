@@ -3,8 +3,7 @@ console.log("modal is called.")
 /**
  * TODO
  * modal.css
- * set_yes_btn(){ return this;}
- * set_no_btn(){ return this;}
+ * modaless class
  * 
  */
 class Modal{
