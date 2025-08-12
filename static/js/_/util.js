@@ -523,10 +523,14 @@ class Block{
         // this.focused = null;
         this.mouseX = 0;
         this.mouseY = 0;
+        this.offsetX = 0;
+        this.offsetY = 0;
         // TODO touch
         document.body.addEventListener("mousedown",function(e){
             Block.mouseX = e.pageX;
             Block.mouseY = e.pageY;
+            Block.offsetX = e.offsetX;
+            Block.offsetY = e.offsetY;
         });
         this.MAX_ZINDEX = 1;
         this.MIN_ZINDEX = 0;
@@ -552,6 +556,10 @@ class Block{
         return Block.list.filter((b)=>b.focused===true);
     }
 
+    static get copied(){
+        return Block.list.filter((b)=>b.copied===true);
+    }
+
     static syncronize_move(blk){
         for(let b of Block.focused){
             if(b !== blk){
@@ -567,6 +575,23 @@ class Block{
                 b.size(b.w + blk.gap.w, b.h + blk.gap.h);
                 b.draw();
             }
+        }
+    }
+
+    static cut(){
+        for(let b of Block.focused){
+            b.visible = false;
+            b.copied = true;
+            b.draw();
+        }
+    }
+
+    static paste(){
+        for(let b of Block.copied){
+            b.visible = true;
+            b.copied = false;
+            b.move(b.x + Block.offsetX, b.y + Block.offsetY);
+            b.draw();
         }
     }
 
@@ -611,6 +636,7 @@ class Block{
         };
 
         this.focused = false;
+        this.copied = false;
         this.active = false;
         this.relations = {};
 
@@ -2325,7 +2351,7 @@ class TabPage extends DOM{
         this.data = {};     //初期データ
         this.pages = {};    //実際の画面DOMデータ
         this.css = this.style();
-        TabPage.list.push(this);
+        // TabPage.list.push(this);
     }
 
     style(){
