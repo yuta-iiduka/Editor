@@ -6,12 +6,11 @@
 // g.draw();
 
 const scheduler = new Scheduler("#sample");
-scheduler
-.make("1")
-.make("2")
-.make("3")
-.make("4")
-.make("5")
+scheduler.make("1")
+scheduler.make("2")
+scheduler.make("3")
+scheduler.make("4")
+scheduler.make("5")
 
 async function init_scheduler(){
     let pro = new Promise((resolve)=>{console.log("start");resolve();})
@@ -19,13 +18,13 @@ async function init_scheduler(){
         scheduler.active_data = i;
         pro = new Promise((resolve)=>{
             for(let d = 0; d<120; d++){
-                scheduler.make(`data ${i}:${d} block`,{x:i,y:d,z:1,w:1,h:1});
+                const b = scheduler.item(`data ${i}:${d} block`,{x:i,y:d,z:1,w:1,h:1});
+                b.sizableX = false;
             }
             resolve();
         });
     }
 }
-
 
 const sm = new SideMenu("body",SideMenu.MODE.RIGHT); //b.dom,SideMenu.MODE.RIGHT
 sm.build(document.createTextNode("xxx"));

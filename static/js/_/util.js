@@ -1,4 +1,7 @@
 console.log("util.js is called.");
+/**
+ * TODO:ジャーナルなどの表示機能
+ */
 
 
 class Platform{
@@ -193,6 +196,7 @@ class Grid{
         this.lineSubColor = "#aaaaaa";
         this._width  = this.dom.offsetWidth;
         this._height = this.dom.offsetHeight;
+        this._fit_event = null;
 
         this.draw();
 
@@ -315,6 +319,10 @@ class Grid{
             this.fit(o);
             // 描画
             o.draw();
+        }
+        // fit後のイベント
+        if(typeof(this._fit_event) === "function"){
+            this._fit_event(this.objects);
         }
     
     }
@@ -458,7 +466,6 @@ class Grid{
         // フォントサイズを変更
         if(this.fontResize === true){
             this.fontSize = Grid.windowRatio.w * this.baseFontSize;
-
         }
 
         // グリッドの再描画
@@ -525,16 +532,38 @@ class Block{
         this.mouseY = 0;
         this.offsetX = 0;
         this.offsetY = 0;
+        this.clientX = 0;
+        this.clientY = 0;
+        this.clicked = null;
         // TODO touch
         document.body.addEventListener("mousedown",function(e){
-            Block.mouseX = e.pageX;
-            Block.mouseY = e.pageY;
-            Block.offsetX = e.offsetX;
-            Block.offsetY = e.offsetY;
+            if(e.button == 0){
+                Block.mousepoint(e,"page");
+            }else if(e.button == 2){
+                Block.mousepoint(e,"page");
+                Block.mousepoint(e,"offset");
+            }else{
+                // マウスの中央などのそのほかのボタン
+            }
         });
         this.MAX_ZINDEX = 1;
         this.MIN_ZINDEX = 0;
         
+    }
+
+    static mousepoint(e,mode="page"){
+        if(mode === "page"){
+            Block.mouseX = e.pageX;
+            Block.mouseY = e.pageY;
+        }else if(mode === "offset"){
+            Block.offsetX = e.offsetX;
+            Block.offsetY = e.offsetY;
+        }else{
+            Block.mouseX = e.pageX;
+            Block.mouseY = e.pageY;
+            Block.offsetX = e.offsetX;
+            Block.offsetY = e.offsetY;
+        }
     }
 
     static focus(){
@@ -587,11 +616,24 @@ class Block{
     }
 
     static paste(){
+        // 起点となる最も距離が上のBlockを取得する。
+        const base = Block.copied.reduce((min,item)=>item.y < min.y ? item : min);
+        const baseX = base.x; // ここで定数かしないと、forの中で起点がずれる可能性がある
+        const baseY = base.y;
+        console.log(base,base.x,base.y);
         for(let b of Block.copied){
             b.visible = true;
             b.copied = false;
-            b.move(b.x + Block.offsetX, b.y + Block.offsetY);
+            b.move(Block.offsetX - baseX + b.x, Block.offsetY -  baseY + b.y);
             b.draw();
+        }
+    }
+
+    static remove(){
+        for(let b of Block.focused){
+            b.visible = false;
+            b.remove();
+            Block.list = Block.list.filter((o)=> b !== o);
         }
     }
 
@@ -619,7 +661,7 @@ class Block{
         this._p = {x:this.x,y:this.y,z:this.z,w:this.w,h:this.h};
         this.gap = {x:0,y:0,z:0,w:0,h:0};
         this.laps = [];
-        this.interval = 100;
+        this.interval = 50;
         this.lastExecutionTime = Date.now();
         
         // DOM情報
@@ -645,9 +687,13 @@ class Block{
         this.resizable = true;
         this.visible = true;
         this.fitable = true;
+        this.movableX = true;
+        this.movableY = true;
+        this.sizableX = true;
+        this.sizableY = true;
 
-        this.vertical = true;
-        this.horizontal = true;
+        // this.vertical = true;
+        // this.horizontal = true;
 
         this.baseBorderColor = "";
         this.storongBorderColor = "yellow";
@@ -716,15 +762,15 @@ class Block{
     move(x,y){
         this.gap.x = x - this.x;
         this.gap.y = y - this.y;
-        if(this.horizontal === true){this.x = x};
-        if(this.vertical   === true){this.y = y};
+        if(this.movableX === true){this.x = x};
+        if(this.movableY === true){this.y = y};
     }
 
     size(w,h){
         this.gap.w = w - this.w;
         this.gap.h = h - this.h;
-        if(this.horizontal === true){this.w = w};
-        if(this.vertical   === true){this.h = h};
+        if(this.sizableX === true){this.w = w};
+        if(this.sizableY === true){this.h = h};
     }
 
     make(html="", editable=false){
@@ -846,6 +892,7 @@ class Block{
             self.movable = true;
             baseL = self.pack.offsetLeft;
             baseT = self.pack.offsetTop;
+            Block.clicked = self;
         });
 
         // マウスによるリサイズ
@@ -1167,10 +1214,6 @@ class Block{
         return this.pack.style.position = posi;
     }
 
-    get contextmenu(){
-        return this._contextmenu;
-    }
-
     glovalize(){
         this.position = "fixed";
     }
@@ -1178,6 +1221,10 @@ class Block{
     localize(){
         this.position = "absolute";
     }
+
+    get contextmenu(){
+        return this._contextmenu;
+    }    
 
     set contextmenu(func){
         if(typeof(func) === "function"){
@@ -2443,15 +2490,60 @@ class Scheduler{
 
     constructor(selector="body"){
         this.dom = document.querySelector(selector);
+        this.dom.addEventListener("click",()=>{
+            this.contextmenu.hide();
+        })
         this.grid = new GridFixLocal(1440,64,128,64,selector);
         this.dom.style.width  = `${this.grid.w * this.grid.x}px`;
         this.dom.style.height = `${this.grid.h * this.grid.y}px`;
+        this.contextmenu = new ContextMenu(selector);
+        this.contextmenu.zIndex = 99;
+        this.contextmenu.append("切り取り",()=>{this.cut();});
+        this.contextmenu.append("貼り付け",()=>{this.paste();});
+        this.contextmenu.append("挿入",()=>{this.insert();});
+        this.contextmenu.build();
         this.data = [];
         this.page = [];
         this.active_page = 0;
         this.active_data = 0;
 
         Scheduler.list.push(this);
+    }
+
+    insert(){
+        const base = Block.clicked;
+        if(base){
+            new Promise((resolve)=>{
+                const baseX = base.x;
+                const baseY = base.y;
+                const blocks = this.page[this.active_page].filter((b)=>b.y >= baseY);
+                console.log(base,blocks);
+                for(let b of blocks){
+                    if(b.y === baseY){
+                        this.grid.size(b,0,1);
+                    }else{
+                        this.grid.move(b,0,1);
+                    }
+                }
+                this.item("insert",{x:3,y:parseInt(baseY / this.grid.h),z:1,w:2,h:1});
+                resolve();
+            });
+        }
+    }
+
+    remove(o){
+        this.data = this.data.filter((b)=>o !== b);
+        for(let i=0; i<this.page.length; i++){
+            this.page[i] = this.page[i].filter((b)=>o !== b);
+        }
+    }
+
+    cut(){
+        Block.cut();
+    }
+
+    paste(){
+        Block.paste();
     }
 
     get map(){
@@ -2471,24 +2563,36 @@ class Scheduler{
         return n;
     }
 
-    make(html,p={x:1,y:1,z:1,w:1,h:1}){
+    item(dom,p={x:1,y:1,z:1,w:1,h:1}){
+        let b = null;
+        if(typeof(dom) === "string"){
+            b = this.make(dom,p);
+            
+        }else{
+            b = this.wrap(dom,p);
+        }
+        b.movableX = false;
+        return b;
+    }
+
+    make(html,p={x:1,y:1,z:1,w:10,h:1}){
         const b = new Block(p.x,p.y,p.z,p.w,p.h).make(html);
         this.grid.append(b.id,b);
         if(!this.data[this.active_data]){
             this.data[this.active_data] = [];
         }
         this.data[this.active_data].push(b);
-        return this
+        return b;
     }
 
-    wrap(selector){
-        const b = new Block(1,1,1,10,1).wrap(selector);
+    wrap(selector,p={x:1,y:1,z:1,w:10,h:1}){
+        const b = new Block(p.x,p.y,p.z,p.w,p.h).wrap(selector);
         this.grid.append(b.id,b);
         if(!this.data[this.active_data]){
             this.data[this.active_data] = [];
         }
         this.data[this.active_data].push(b);
-        return this
+        return b;
     }
 
     filterable(){
@@ -2597,6 +2701,8 @@ class ContextMenu extends DOM{
             .frame-${this.type()}{
                 position: fixed;
                 display: none;
+                /* ここのZINDEXの調整は、実装によって調整すべき */
+                z-index: 10; 
             }
             .frame-${this.type()}.active{
                 display: block;
@@ -2605,6 +2711,10 @@ class ContextMenu extends DOM{
                 padding: 4px;
                 background-color: ${this.backgroundColor};
                 color: ${this.color};
+                border-bottom: 1px solid grey;
+            }
+            .contextmenu-list:hover{
+                background-color: grey;
             }
         `);
     }
@@ -2634,7 +2744,7 @@ class ContextMenu extends DOM{
             const div = DOM.create("div",{class:"contextmenu-list"});
             div.addEventListener("click",(e)=>{
                 m.func(e);
-                this.hide();
+                this.hide(e);
             });
             div.textContent = m.name;
             this.contents.appendChild(div);
@@ -2650,6 +2760,8 @@ class ContextMenu extends DOM{
         this.contents.style.left = `${x}px`;
         this.contents.style.top = `${y}px`;
         this.contents.style.zIndex = this.zIndex;
+        this.contents.style.border = `1px solid grey`;
+        this.contents.style.borderRadius = `3px`;
     }
     
     hide(e){
