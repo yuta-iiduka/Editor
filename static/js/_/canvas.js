@@ -361,13 +361,13 @@ class CanvasMouse extends CanvasObject{
     }
 }
 
-class Overlay extends Canvas{
-    constructor(selector,option={opacity:0.5}){
-        super(selector);
-        this.dom.style.pointerEvents = "none";
-        this.style(option);
-    }
-}
+// class Overlay extends Canvas{
+//     constructor(selector,option={opacity:0.5}){
+//         super(selector);
+//         this.dom.style.pointerEvents = "none";
+//         this.style(option);
+//     }
+// }
 
 /**
  * リサイズにより画面外になってしまうと描画データが消えてしまう。

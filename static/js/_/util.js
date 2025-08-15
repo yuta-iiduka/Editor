@@ -103,8 +103,12 @@ class DOM {
     }
 
     append(){
+        return this.index();
+    }
+
+    index(){
         let id = 0
-        const t = this.type()
+        const t = this.type();
         if(DOM.dict[t]){
             id = DOM.counter[t];
             DOM.dict[t][id] = this;
@@ -197,8 +201,10 @@ class Grid{
         this._width  = this.dom.offsetWidth;
         this._height = this.dom.offsetHeight;
         this._fit_event = null;
-
+        this.label_mode = "num"; // "num", "date", "datetime"
         this.draw();
+        this.labelsX = this.labelingX();
+
 
         Grid.list.push(this);
     }
@@ -301,6 +307,40 @@ class Grid{
             self.draw();
         });
         return dom;
+    }
+
+
+    /**
+     * TODO: date, datetimeのラベリング
+     * @returns {Array} tmp
+     */
+    labelingX(){
+        const tmp = [];
+        const lbl  = DOM.create("div",{class:"grid-label"});
+        const lbls = DOM.create("div",{class:"grid-labels"});
+        lbls.style.display = "flex";
+        lbls.style.position = "sticky";
+        lbls.style.zIndex = 2;
+        lbls.style.top = 0;
+        lbl.style.display = "block";
+        lbl.style.flex = 1;
+        lbl.style.textAlign = "center";
+        for(let i=0; i<this.x; i++){
+            const l = lbl.cloneNode(true);
+            let t = "";
+            if(this.label_mode === "num"){
+                t = i;
+            }else if(this.label_mode === "date"){
+                t = "";
+            }else if(this.label_mode === "datetime"){
+                t = "";
+            }
+            l.textContent = t;
+            tmp.push(l);
+            lbls.appendChild(l);
+        }
+        this.dom.appendChild(lbls);
+        return tmp;
     }
     
     draw(){
@@ -525,6 +565,7 @@ class GridFixLocal extends GridFix{
 
 class Block{
     static{
+        this.is_initialized = false;
         this.cnt = 0;
         this.list = [];
         // this.focused = null;
@@ -535,35 +576,26 @@ class Block{
         this.clientX = 0;
         this.clientY = 0;
         this.clicked = null;
-        // TODO touch
-        document.body.addEventListener("mousedown",function(e){
-            if(e.button == 0){
-                Block.mousepoint(e,"page");
-            }else if(e.button == 2){
-                Block.mousepoint(e,"page");
-                Block.mousepoint(e,"offset");
-            }else{
-                // マウスの中央などのそのほかのボタン
-            }
-        });
         this.MAX_ZINDEX = 1;
         this.MIN_ZINDEX = 0;
-        
+        this.initializer();
     }
 
-    static mousepoint(e,mode="page"){
-        if(mode === "page"){
+    static initializer(){
+        this.is_initialized = true;
+        // TODO touch
+        document.body.addEventListener("mousedown",function(e){
             Block.mouseX = e.pageX;
             Block.mouseY = e.pageY;
-        }else if(mode === "offset"){
-            Block.offsetX = e.offsetX;
-            Block.offsetY = e.offsetY;
-        }else{
-            Block.mouseX = e.pageX;
-            Block.mouseY = e.pageY;
-            Block.offsetX = e.offsetX;
-            Block.offsetY = e.offsetY;
-        }
+        });
+
+        // ここでいい感じに設定できればよいが、ちょうどよい設定が見つからない
+        // this.dom.addEventListener("mousemove",(e)=>{
+        //     if(this.dom === e.target){
+        //         Block.offsetX = e.offsetX;
+        //         Block.offsetY = e.offsetY;
+        //     }
+        // });
     }
 
     static focus(){
@@ -618,7 +650,7 @@ class Block{
     static paste(){
         // 起点となる最も距離が上のBlockを取得する。
         const base = Block.copied.reduce((min,item)=>item.y < min.y ? item : min);
-        const baseX = base.x; // ここで定数かしないと、forの中で起点がずれる可能性がある
+        const baseX = base.x; // ここで定数化しないと、forの中で起点がずれる可能性がある
         const baseY = base.y;
         console.log(base,base.x,base.y);
         for(let b of Block.copied){
@@ -1370,7 +1402,7 @@ class Sticky{
     }
 
     static theme(style){
-        Dom.style(`${style}`);
+        DOM.style(`${style}`);
     }
 
     constructor(x=10,y=10,z=1,w=5,h=5){
@@ -2211,7 +2243,7 @@ class SideMenu extends DOM {
 
     static list = [];
     static MODE = {LEFT:"left",RIGHT:"right"};
-    static CONST = {TO_RIGHT:"&#9655",TO_LEFT:"&#9665"};
+    static CONST = {TO_RIGHT:"&#9655",TO_LEFT:"&#9665",ZINDEX:10};
 
     constructor(selector="body",mode=SideMenu.MODE.LEFT){
         super(selector);
@@ -2219,6 +2251,7 @@ class SideMenu extends DOM {
         this.css = this.style();
         this.btn_op = null;
         this.btn_cl = null;
+        this.zIndex = SideMenu.CONST.ZINDEX; /** ここの調整はContextMenu優先か、SideMenu優先か */
         
         SideMenu.list.push(this);
     }
@@ -2232,6 +2265,7 @@ class SideMenu extends DOM {
                 left: 0px;
                 top: 0px;
                 pointer-events:none;
+                z-index:${this.zIndex ?? SideMenu.CONST.ZINDEX};
             }
 
             .sidemenu-contents{
@@ -2484,30 +2518,150 @@ class TabPage extends DOM{
     }
 }
 
+class Overlay{
+    static id = 0;
+    static list = [];
+    static SIZE = {WIDTH:window.innerWidth,HEIGHT:window.innerHeight};
+    static is_build = false;
+
+    static initializer(){
+        window.addEventListener("resize",()=>{
+            for(let o of Overlay.list){
+                o.resize();  
+            }
+        });
+        this.style().build();
+    }
+
+    static style(){
+        return new Style(`
+            .overlay-canvas{
+                height: 100%;
+                width: 100%;
+                position: relative;
+                z-index: 1;
+                left:0px;
+                top:0px;
+                pointer-events: none;
+                background-color:none;
+                opacity:0.5;
+            }
+        `);
+    }
+
+    constructor(selector){
+        if(Overlay.is_build === false){Overlay.initializer();}
+        if(selector === "string"){
+            this.frame = document.querySelector(selector);
+        }else{
+            this.frame = selector;
+        }
+        this.id = Overlay.id++;
+        this.canvas = this.make();
+        this.frame.appendChild(this.canvas);
+        this.resize();
+        this.ctx = this.canvas.getContext("2d");
+        Overlay.list.push(this);
+    }
+
+    make(){
+        const canvas = document.createElement("canvas");
+        canvas.classList.add("overlay-canvas");
+        return canvas;
+    }
+
+    resize(){
+        this.canvas.width  = `${this.frame.offsetWidth}`;
+        this.canvas.height = `${this.frame.offsetHeight}`; 
+        this.redraw();
+    }
+
+    refresh(){
+        // 描写の初期化
+        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+    }
+
+    text(t,p={x:1,y:1}){
+        this.ctx.fillStyle = "orange";
+        this.ctx.fillText(t,p.x,p.y);
+        return this.ctx;
+    }
+
+    draw(){
+        this.ctx.beginPath();
+        this.ctx.moveTo(0,0);
+        this.ctx.lineTo(this.canvas.offsetWidth,this.canvas.offsetHeight);
+        this.ctx.strokeStyle = "orange";
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+        return this.ctx;
+    }
+
+    redraw(){
+        return this;
+    }
+}
+
 class Scheduler{
     static cnt = 0;
     static list = [];
 
     constructor(selector="body"){
+        this.id = Scheduler.cnt++;
         this.dom = document.querySelector(selector);
         this.dom.addEventListener("click",()=>{
             this.contextmenu.hide();
-        })
+            this.dom.focus();
+        });
+
+        // グリッド描画の初期化
         this.grid = new GridFixLocal(1440,64,128,64,selector);
         this.dom.style.width  = `${this.grid.w * this.grid.x}px`;
         this.dom.style.height = `${this.grid.h * this.grid.y}px`;
+
+        // 右クリックメニューの初期化
         this.contextmenu = new ContextMenu(selector);
-        this.contextmenu.zIndex = 99;
+        this.contextmenu.zIndex = ContextMenu.CONST.ZINDEX;
         this.contextmenu.append("切り取り",()=>{this.cut();});
         this.contextmenu.append("貼り付け",()=>{this.paste();});
         this.contextmenu.append("挿入",()=>{this.insert();});
         this.contextmenu.build();
+
+        // ショートカットの初期化
+        this.shortcut = new ShortCut(selector);
+        this.shortcut.append("x",()=>{this.cut()});
+        this.shortcut.append("v",()=>{this.paste()});
+        this.shortcut.append("i",()=>{this.insert()});
+        this.shortcut.build();
+
+        // マウスの場所を登録する処理を追加
+        this.dom.addEventListener("mousemove",(e)=>{
+            if(this.dom === e.target){
+                Block.offsetX = e.offsetX;
+                Block.offsetY = e.offsetY;
+            }
+        });
+
         this.data = [];
         this.page = [];
         this.active_page = 0;
         this.active_data = 0;
 
+        if(this.id === 0){this.style().build();}
+
         Scheduler.list.push(this);
+    }
+
+    style(){
+        return new Style(`
+            .grid-labels{
+                width:${this.grid.width}px;
+                margin-left:${this.grid.w / 2}px;
+            }
+            .grid-label{
+                width:${this.grid.w}px;
+            }
+        `);
     }
 
     insert(){
@@ -2670,11 +2824,12 @@ class DateTime{
 }
 
 class ContextMenu extends DOM{
+    static CONST = {ZINDEX:10};
 
     constructor(selector="body"){
         super(selector);
         this.is_active = false;
-        this.zIndex = 1;
+        this.zIndex = ContextMenu.CONST.ZINDEX;
         this.color = "white";
         this.backgroundColor = "black";
         this.list = [];
@@ -2702,7 +2857,7 @@ class ContextMenu extends DOM{
                 position: fixed;
                 display: none;
                 /* ここのZINDEXの調整は、実装によって調整すべき */
-                z-index: 10; 
+                z-index: ${this.zIndex ?? ContextMenu.CONST.ZINDEX}; 
             }
             .frame-${this.type()}.active{
                 display: block;
@@ -2724,6 +2879,7 @@ class ContextMenu extends DOM{
             "name":name,
             "func":func,
         });
+        this.set_menu();
         return this;
     }
 
@@ -2739,15 +2895,17 @@ class ContextMenu extends DOM{
     }
 
     set_menu(){
-        this.contents.innerHTML = "";
-        for(let m of this.list){
-            const div = DOM.create("div",{class:"contextmenu-list"});
-            div.addEventListener("click",(e)=>{
-                m.func(e);
-                this.hide(e);
-            });
-            div.textContent = m.name;
-            this.contents.appendChild(div);
+        if(this.contents){
+            this.contents.innerHTML = "";
+            for(let m of this.list){
+                const div = DOM.create("div",{class:"contextmenu-list"});
+                div.addEventListener("click",(e)=>{
+                    m.func(e);
+                    this.hide(e);
+                });
+                div.textContent = m.name;
+                this.contents.appendChild(div);
+            }
         }
         return this;
     }
@@ -2794,6 +2952,110 @@ class ContextMenu extends DOM{
         this.set_menu();
     }
 
+}
+
+/**
+ * Ctrl キー入力
+ */
+class ShortCut extends DOM{
+
+    constructor(selector){
+        super(selector);
+        this.is_active = true;
+        this.funcs = {};
+        this.id = this.index();
+    }
+
+    get keys(){
+        return Object.keys(this.funcs);
+    }
+
+    activate(){
+        this.is_active = true;
+    }
+
+    deactivate(){
+        this.is_active = false;
+    }
+
+    /**
+     * 
+     * @param {String} key 小文字アルファベット 
+     * @param {Function} func ショートカットキー入力によって発火する関数
+     * @returns 
+     */
+    append(key,func){
+        if(typeof(func) === "function"){
+            this.funcs[key] = func;
+        }
+        return this;
+    }
+
+    remove(key){
+        if(this.keys.includes(this.keys)){
+            delete this.funcs[key];
+        }
+        return this;
+    }
+
+    build(){
+        super.build();
+        // ショートカットキーの初期化
+        this.parent.setAttribute("tabindex",this.id);
+        this.parent.addEventListener("keydown",(e)=>{
+            if(this.is_active){
+                this.keydown(e);
+            }
+        });
+        return this;
+    }
+
+    keydown(e){
+        // console.log(this.keys.includes(e.key),e.key,e.ctrlKey);
+        if( this.keys.includes(e.key) && e.ctrlKey){
+            this.funcs[e.key](e);
+            e.preventDefault();
+        }
+    }
+}
+
+/**
+ * Ctrl + Shiftのキー入力
+ */
+class ShortCutShift extends ShortCut{
+
+    constructor(selector){
+        super(selector);
+    }
+
+    append(key,func){
+        return super.append(key.toUpperCase(),func);
+    }
+
+    keydown(e){
+        if(e.shiftKey){
+            super.keydown(e);
+        }
+    }
+}
+
+
+/**
+ * Ctrl + Shiftのキー入力
+ */
+class ShortCutAlt extends ShortCut{
+
+    constructor(selector){
+        super(selector);
+    }
+
+    keydown(e){
+        if( this.keys.includes(e.key) && e.altKey){
+            console.log(e.key, e.altKey);
+            this.funcs[e.key](e);
+            e.preventDefault();
+        }
+    }
 }
 
 class DataEditor extends DOM{
