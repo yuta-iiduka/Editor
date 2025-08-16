@@ -14,7 +14,7 @@ scheduler.make("5")
 
 async function init_scheduler(){
     let pro = new Promise((resolve)=>{console.log("start");resolve();})
-    for(let i = 0; i<10; i++){
+    for(let i = 0; i<30; i++){
         scheduler.active_data = i;
         pro = new Promise((resolve)=>{
             for(let d = 0; d<120; d++){

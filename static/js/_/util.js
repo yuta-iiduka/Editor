@@ -3,6 +3,19 @@ console.log("util.js is called.");
  * TODO:ジャーナルなどの表示機能
  */
 
+class NowLoading{
+    constructor(selector="body"){
+        this.dom = document.querySelector(selector);
+    }
+
+    show(message=""){
+        return this;
+    }
+
+    hide(){
+        return this;
+    }
+}
 
 class Platform{
 
@@ -27,6 +40,7 @@ class Style{
 
     build(){
         this.dom.innerHTML = this.css;
+        return this;
     }
 
     update(){
@@ -432,7 +446,7 @@ class Grid{
         }
 
         if(o.y + o.height > this.height){
-            console.log(o.y , h, this.height);
+            // console.log(o.y , h, this.height);
             o.y = this.height - o.height;
         }
 
@@ -645,6 +659,8 @@ class Block{
             b.copied = true;
             b.draw();
         }
+
+        return Block.copied;
     }
 
     static paste(){
@@ -653,13 +669,36 @@ class Block{
         const baseX = base.x; // ここで定数化しないと、forの中で起点がずれる可能性がある
         const baseY = base.y;
         console.log(base,base.x,base.y);
+        const tmp = [];
         for(let b of Block.copied){
             b.visible = true;
             b.copied = false;
             b.move(Block.offsetX - baseX + b.x, Block.offsetY -  baseY + b.y);
             b.draw();
+            tmp.push(b);
         }
+        return tmp;
     }
+
+    static copy(){
+        // 起点となる最も距離が上のBlockを取得する。
+        const base = Block.focused.reduce((min,item)=>item.y < min.y ? item : min);
+        const baseX = base.x; // ここで定数化しないと、forの中で起点がずれる可能性がある
+        const baseY = base.y;
+        const tmp = []
+        for(let b of Block.focused){
+            b.focused = false;
+            const cp = new Block(b.p.x + 1, b.p.y + 1, b.p.z, b.p.w, b.p.h).make(b.dom.innerHTML);
+            cp.focused = true;
+            tmp.push(cp);
+            cp.draw();
+        }
+
+        Block.focus();
+
+        return tmp;
+    }
+
 
     static remove(){
         for(let b of Block.focused){
@@ -681,6 +720,28 @@ class Block{
         );
     }
 
+
+
+    /**
+     * Block検索関数 検索条件を引数にする
+     * @param {Dict} condition 
+     * @returns 
+     */
+    static find(condition={text:"text",id:0}){
+        let result = [...Block.list];
+        for(let k of Object.keys(condition)){
+            const v = condition[k];
+            if(k === "text"){
+                result = result.filter((r)=>r.pack.innerHTML.includes(v));
+            }else if(k === "id"){
+                result = result.filter((r)=>r.id == id);
+            }else{
+                result = result.filter((r)=>r.data[k] == v);
+            }
+        }
+        return result
+    }
+
     constructor(x=10,y=10,z=1,w=5,h=5){
         this.id = Block.cnt++;
         // 座標情報
@@ -693,7 +754,7 @@ class Block{
         this._p = {x:this.x,y:this.y,z:this.z,w:this.w,h:this.h};
         this.gap = {x:0,y:0,z:0,w:0,h:0};
         this.laps = [];
-        this.interval = 50;
+        this.interval = 120;
         this.lastExecutionTime = Date.now();
         
         // DOM情報
@@ -713,6 +774,7 @@ class Block{
         this.copied = false;
         this.active = false;
         this.relations = {};
+        this.data = {};
 
         // 機能の有効化・無効化
         this.movable = false;
@@ -749,6 +811,7 @@ class Block{
             this.draw();
         };
         this._collide = (b)=>{b.draw();}
+        this._mousemove = null;
         this._resize = null;
 
         Block.list.push(this);
@@ -979,8 +1042,7 @@ class Block{
             is_frame = false;
         });
 
-        // 中処理
-        document.body.addEventListener("mousemove", function(e){
+        const mousemove = function(e){
             const now = Date.now();
             if (now - self.lastExecutionTime < self.interval) {
                 return;
@@ -1088,8 +1150,12 @@ class Block{
             if(lap === false){
                 self.style.backgroundColor = self.baseBackgroundColor;
             }
+        }
 
-        });
+        this.mousemove = mousemove;
+
+        // 中処理
+        document.body.addEventListener("mousemove", mousemove);
         
         // 後処理
         document.addEventListener("mouseup",function(e){
@@ -1120,6 +1186,8 @@ class Block{
 
     remove(){
         this.pack.remove();
+        const mousemove = this.mousemove;
+        document.body.removeEventListener("mousemove",mousemove);
     }
 
     draw(){
@@ -2602,9 +2670,21 @@ class Overlay{
     }
 }
 
+/**
+ * 依存関係 Block,Grid,ContextMenu,ShortCut,Style
+ */
 class Scheduler{
     static cnt = 0;
     static list = [];
+    static style = null;
+    static CONST = {
+        ERROR:{
+            NOT_FOUND:"対象が見つかりませんでした。"
+        },
+        SUCCESS:{
+            OK:"処理に成功しました。"
+        }
+    }
 
     constructor(selector="body"){
         this.id = Scheduler.cnt++;
@@ -2622,16 +2702,30 @@ class Scheduler{
         // 右クリックメニューの初期化
         this.contextmenu = new ContextMenu(selector);
         this.contextmenu.zIndex = ContextMenu.CONST.ZINDEX;
+        this.contextmenu.append("コピー",()=>{this.copy();});
         this.contextmenu.append("切り取り",()=>{this.cut();});
         this.contextmenu.append("貼り付け",()=>{this.paste();});
         this.contextmenu.append("挿入",()=>{this.insert();});
+        this.contextmenu.append("削除",()=>{this.remove();});
+        this.contextmenu.append("検索",()=>{this.find();});
+        this.contextmenu.append("次の検索結果",()=>{this.findNext(this.target);});
+        this.contextmenu.append("前の検索結果",()=>{this.findBack(this.target);});
         this.contextmenu.build();
 
         // ショートカットの初期化
         this.shortcut = new ShortCut(selector);
+        this.shortcut.append("c",()=>{this.copy()});
         this.shortcut.append("x",()=>{this.cut()});
         this.shortcut.append("v",()=>{this.paste()});
         this.shortcut.append("i",()=>{this.insert()});
+        this.shortcut.append("Delete",()=>{this.remove()});
+        this.shortcut.append("f",()=>{this.find()});
+        this.shortcut.append("p",()=>{this.findNext(this.target)});
+        this.shortcut.append("ArrowUp",()=>{this.findNext(this.target)});
+        this.shortcut.append("ArrowRight",()=>{this.findNext(this.target)});
+        this.shortcut.append("b",()=>{this.findBack(this.target)});
+        this.shortcut.append("ArrowDown",()=>{this.findBack(this.target)});
+        this.shortcut.append("ArrowLeft",()=>{this.findBack(this.target)});
         this.shortcut.build();
 
         // マウスの場所を登録する処理を追加
@@ -2642,18 +2736,33 @@ class Scheduler{
             }
         });
 
+        // 確認モーダルの初期化
+        this.find_mdl = new Modal()
+            .set_title("検索")
+            .set_yes_btn(()=>{},"OK")
+            .set_no_btn(()=>{},"キャンセル");
+        this.find_mdl.show_event = ()=>{this.find_mdl.body.querySelector("input").focus()};
+
+
+        // エラーモーダルの初期化
+        this.emdl = new ErrorModal();
+
+        this.target_condition = {};
+        this.targets = [];
+        this.target = null;
+
         this.data = [];
         this.page = [];
         this.active_page = 0;
         this.active_data = 0;
 
-        if(this.id === 0){this.style().build();}
-
+        // スタイルの初期化
+        Scheduler.style = this.style();
         Scheduler.list.push(this);
     }
 
     style(){
-        return new Style(`
+        return Scheduler.list.length === 0 ? new Style(`
             .grid-labels{
                 width:${this.grid.width}px;
                 margin-left:${this.grid.w / 2}px;
@@ -2661,7 +2770,7 @@ class Scheduler{
             .grid-label{
                 width:${this.grid.w}px;
             }
-        `);
+        `).build() : Scheduler.style;
     }
 
     insert(){
@@ -2673,7 +2782,7 @@ class Scheduler{
                 const blocks = this.page[this.active_page].filter((b)=>b.y >= baseY);
                 console.log(base,blocks);
                 for(let b of blocks){
-                    if(b.y === baseY){
+                    if(parseInt(b.y) === parseInt(baseY) && parseInt(b.x) === parseInt(baseX)){
                         this.grid.size(b,0,1);
                     }else{
                         this.grid.move(b,0,1);
@@ -2685,11 +2794,24 @@ class Scheduler{
         }
     }
 
+    copy(){
+        const blocks = Block.copy();
+        for(let b of blocks){
+            this.append(b);
+        }
+        console.log(blocks);
+        return blocks
+    }
+
     remove(o){
+        // オブジェクト参照をすべて破棄することで、メモリを解放する
         this.data = this.data.filter((b)=>o !== b);
         for(let i=0; i<this.page.length; i++){
             this.page[i] = this.page[i].filter((b)=>o !== b);
         }
+        this.targets = this.targets.filter((t)=>o !== t);
+        this.target = null;
+        Block.remove();
     }
 
     cut(){
@@ -2698,6 +2820,80 @@ class Scheduler{
 
     paste(){
         Block.paste();
+    }
+
+    find(){
+        this.find_mdl.set_body(`<input placeholder="検索するキーワード" />`);
+        this.targets = [];
+        for(let b of Block.list){
+            b.focused = false;
+        }
+        return this.find_mdl.confirm().then(()=>{
+            const text = this.find_mdl.body.querySelector("input").value;
+            if(text === ""){return null}
+            this.target_condition = {text:text};
+            let result = Block.find(this.target_condition);
+            for(let r of result){
+                if(r.visible === true){
+                    r.focused = true;
+                    this.targets.push(r);
+                }
+            }
+            const t = this.targets[0];
+            if(t){
+                this.target = t;
+                this.scroll(t);
+            }
+            return t;
+        });
+    }
+
+    findNext(b){
+        if(b){
+            const i = this.targets.findIndex((t)=>t.id == b.id);
+            let next = 0;
+            if( i + 1 < this.targets.length){
+                next = i + 1;
+            }
+            this.target = this.targets[next];
+            this.scroll(this.target);
+        }else{
+            this.emdl.show(Scheduler.CONST.ERROR.NOT_FOUND);
+        }
+    }
+
+    findBack(b){
+        if(b){
+            const i = this.targets.findIndex((t)=>t.id == b.id);
+            let next = this.targets.length - 1;
+            if( i - 1 >= 0){
+                next = i - 1;
+            }
+            this.target = this.targets[next];
+            this.scroll(this.target);
+        }else{
+            this.emdl.show(Scheduler.CONST.ERROR.NOT_FOUND);
+        }
+    }
+
+    scroll(t){
+        const padding = 64;
+        if(t){
+            t.focused = true;
+            this.dom.parentElement.scrollTo({top:t.y - padding,left:t.x - padding,behavior:"smooth"});
+            Block.focus();
+        }else{
+            this.emdl.show(Scheduler.CONST.ERROR.NOT_FOUND);
+        }
+        this.dom.focus();
+
+    }
+
+    selectAll(){
+        for(let d of this.page[this.active_page]){
+            d.focused = true;
+        }
+        Block.focus();
     }
 
     get map(){
@@ -2729,23 +2925,23 @@ class Scheduler{
         return b;
     }
 
-    make(html,p={x:1,y:1,z:1,w:10,h:1}){
-        const b = new Block(p.x,p.y,p.z,p.w,p.h).make(html);
+    append(b){
         this.grid.append(b.id,b);
         if(!this.data[this.active_data]){
             this.data[this.active_data] = [];
         }
         this.data[this.active_data].push(b);
+    }
+
+    make(html,p={x:1,y:1,z:1,w:10,h:1}){
+        const b = new Block(p.x,p.y,p.z,p.w,p.h).make(html);
+        this.append(b);
         return b;
     }
 
     wrap(selector,p={x:1,y:1,z:1,w:10,h:1}){
         const b = new Block(p.x,p.y,p.z,p.w,p.h).wrap(selector);
-        this.grid.append(b.id,b);
-        if(!this.data[this.active_data]){
-            this.data[this.active_data] = [];
-        }
-        this.data[this.active_data].push(b);
+        this.append(b);
         return b;
     }
 
@@ -2867,6 +3063,7 @@ class ContextMenu extends DOM{
                 background-color: ${this.backgroundColor};
                 color: ${this.color};
                 border-bottom: 1px solid grey;
+                min-width: 120px;
             }
             .contextmenu-list:hover{
                 background-color: grey;
@@ -3011,10 +3208,13 @@ class ShortCut extends DOM{
     }
 
     keydown(e){
-        // console.log(this.keys.includes(e.key),e.key,e.ctrlKey);
-        if( this.keys.includes(e.key) && e.ctrlKey){
-            this.funcs[e.key](e);
+        console.log(this.keys.includes(e.key),e.key,e.ctrlKey);
+        if( e.ctrlKey && this.keys.includes(e.key)){
             e.preventDefault();
+            this.funcs[e.key](e);
+        }else if(e.key === "Delete"){
+            e.preventDefault();
+            this.funcs[e.key](e);
         }
     }
 }
