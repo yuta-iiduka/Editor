@@ -199,7 +199,7 @@ class Grid{
         }
     }
 
-    constructor(x=64,y=64,selector="body"){
+    constructor(x=64,y=64,selector="body",labelX="num"){
         this.id = Grid.id++;
         this.x = x;
         this.y = y;
@@ -215,10 +215,9 @@ class Grid{
         this._width  = this.dom.offsetWidth;
         this._height = this.dom.offsetHeight;
         this._fit_event = null;
-        this.label_mode = "num"; // "num", "date", "datetime"
         this.draw();
+        this.labelX_mode = labelX; // "none","num", "date", "time"
         this.labelsX = this.labelingX();
-
 
         Grid.list.push(this);
     }
@@ -339,16 +338,13 @@ class Grid{
         lbl.style.display = "block";
         lbl.style.flex = 1;
         lbl.style.textAlign = "center";
+        lbl.style.color = "lightblue";
+        lbl.style.fontWeight = "bold";
+        const dt = new DateTime();
+        const lst = dt.list(this.x,this.labelX_mode);
         for(let i=0; i<this.x; i++){
             const l = lbl.cloneNode(true);
-            let t = "";
-            if(this.label_mode === "num"){
-                t = i;
-            }else if(this.label_mode === "date"){
-                t = "";
-            }else if(this.label_mode === "datetime"){
-                t = "";
-            }
+            let t = lst[i] ?? "";
             l.textContent = t;
             tmp.push(l);
             lbls.appendChild(l);
@@ -530,8 +526,8 @@ class Grid{
 class GridFix extends Grid{
     static defaultW = Grid.width / 32;
     static defaultH = Grid.height / 32;
-    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body"){
-        super(x,y,selector);
+    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body",labelX="none"){
+        super(x,y,selector,labelX);
         this._x = x;
         this._y = y;
         this._w = w;
@@ -553,8 +549,8 @@ class GridFix extends Grid{
 }
 
 class GridFixGlobal extends GridFix{
-    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body"){
-        super(x,y,w,h,selector);
+    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body",labelX="none"){
+        super(x,y,w,h,selector,labelX);
         this._x = x;
         this._y = y;
         this._w = w;
@@ -565,8 +561,8 @@ class GridFixGlobal extends GridFix{
 }
 
 class GridFixLocal extends GridFix{
-    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body"){
-        super(x,y,w,h,selector);
+    constructor(x=64,y=64,w=GridWide.defaultW,h=GridWide.defaultH,selector="body",labelX="none"){
+        super(x,y,w,h,selector,labelX);
         this._x = x;
         this._y = y;
         this._w = w;
@@ -772,6 +768,7 @@ class Block{
 
         this.focused = false;
         this.copied = false;
+        this.moved = false;
         this.active = false;
         this.relations = {};
         this.data = {};
@@ -1011,6 +1008,7 @@ class Block{
                     b.focused = false;
                 }
             } 
+            self.moved   = true;
             self.focused = true;
             Block.focus();
 
@@ -1043,6 +1041,9 @@ class Block{
         });
 
         const mousemove = function(e){
+            if(self.moved === false){
+                return;
+            }
             const now = Date.now();
             if (now - self.lastExecutionTime < self.interval) {
                 return;
@@ -2683,19 +2684,29 @@ class Scheduler{
         },
         SUCCESS:{
             OK:"処理に成功しました。"
+        },
+        RATIO:{
+            MARGIN:{
+                LABELX:0.5
+            }
         }
     }
 
     constructor(selector="body"){
         this.id = Scheduler.cnt++;
+
+        this.ratio = {
+            margin_labelX:Scheduler.CONST.RATIO.MARGIN.LABELX,
+        }
+
         this.dom = document.querySelector(selector);
         this.dom.addEventListener("click",()=>{
             this.contextmenu.hide();
             this.dom.focus();
         });
 
-        // グリッド描画の初期化
-        this.grid = new GridFixLocal(1440,64,128,64,selector);
+        // グリッド描画の初期化(x:1440+見出し)
+        this.grid = new GridFixLocal(1441,64,128,64,selector,"minute");
         this.dom.style.width  = `${this.grid.w * this.grid.x}px`;
         this.dom.style.height = `${this.grid.h * this.grid.y}px`;
 
@@ -2756,21 +2767,19 @@ class Scheduler{
         this.active_page = 0;
         this.active_data = 0;
 
-        // スタイルの初期化
-        Scheduler.style = this.style();
         Scheduler.list.push(this);
     }
 
     style(){
-        return Scheduler.list.length === 0 ? new Style(`
+        return Scheduler.style ?? new Style(`
             .grid-labels{
                 width:${this.grid.width}px;
-                margin-left:${this.grid.w / 2}px;
+                margin-left:${parseFloat(this.grid.w) * parseFloat(this.ratio.margin_labelX)}px;
             }
             .grid-label{
                 width:${this.grid.w}px;
             }
-        `).build() : Scheduler.style;
+        `).build();
     }
 
     insert(){
@@ -2992,8 +3001,11 @@ class Scheduler{
     }
 
     build(){
+        // 表示データの初期化
         this.turn_data();
         this.turn_page();
+        // スタイルの初期化
+        Scheduler.style = this.style();
         return this;
     }
 
@@ -3016,6 +3028,106 @@ class DateTime{
         end2 = typeof(end2) === "string" ? new Date(end2) : end2 
 
         return (start1 < end2 && start2 < end1);
+    }
+
+    static zero_pad(num,length){
+        return (Array(length).join("0") + num).slice(-length);
+    }
+
+    static get baseDate(){
+        const d = new Date();
+        d.setFullYear(0);
+        d.setMonth(1);
+        d.setDate(1);
+        d.setHours(0);
+        d.setMinutes(0);
+        d.setSeconds(0);
+        return d;
+    }
+
+    constructor(date){
+        this.base = date ?? DateTime.baseDate;
+        this.next = new Date(this.base.getTime());
+        this.i = 0;
+        this.array = [];
+    }
+
+    format(d,f="YYYY/MM/DD HH:mm:ss"){
+        let map = {
+            YYYY: d.getFullYear(),
+            MM: DateTime.zero_pad(d.getMonth() + 1, 2),
+            DD: DateTime.zero_pad(d.getDate(), 2),
+            HH: DateTime.zero_pad(d.getHours(), 2),
+            mm: DateTime.zero_pad(d.getMinutes(), 2),
+            ss: DateTime.zero_pad(d.getSeconds(), 2),
+        };
+        return f.replace(/YYYY|MM|DD|HH|mm|ss/g,(match)=>map[match]);
+    }
+
+    toDate(base){
+        return this.format(base ?? this.base, "YYYY/MM/DD HH:mm");
+    }
+
+    toTime(base){
+        return this.format(base ?? this.base, "YYYY/MM/DD HH:mm:ss");
+    }
+
+    toNum(base){
+        return this.i;
+    }
+
+    toHour(base){
+        return this.format(base ?? this.base, "DD HH:mm");
+    }
+
+    toMinute(base){
+        return this.format(base ?? this.base, "HH:mm");
+    }
+
+    toSecond(base){
+        return this.format(base ?? this.base, "mm:ss");
+    }
+
+    list(m=60,mode="date"){
+        this.array = [];
+        if(mode==="date"){
+            for(let i = 0; i < m; i++){
+                this.array.push(this.toDate(this.next));
+                this.next.setMinutes(this.next.getMinutes() + 1);
+            }
+        }else if(mode==="time"){
+            for(let i = 0; i < m; i++){
+                this.array.push(this.toTime(this.next));
+                this.next.setSeconds(this.next.getSeconds() + 1);
+            }
+        }else if(mode==="num"){
+            for(let i = 0; i< m; i++){
+                this.array.push(this.toNum(this.next));
+                this.i++;
+            }
+        }else if(mode==="second"){
+            for(let i = 0; i< m; i++){
+                this.array.push(this.toSecond(this.next));
+                this.next.setSeconds(this.next.getSeconds() + 1);
+            }
+        }else if(mode==="minute"){
+            for(let i = 0; i < m; i++){
+                this.array.push(this.toMinute(this.next));
+                this.next.setMinutes(this.next.getMinutes() + 1);
+            }
+        }else if(mode==="hour"){
+            for(let i = 0; i < m; i++){
+                this.array.push(this.toHour(this.next));
+                this.next.setHours(this.next.getHours() + 1);
+            }
+        }
+        return this.array;
+    }
+}
+
+class DateTimeNow extends DateTime{
+    constructor(){
+        super(new Date());
     }
 }
 
@@ -3208,7 +3320,6 @@ class ShortCut extends DOM{
     }
 
     keydown(e){
-        console.log(this.keys.includes(e.key),e.key,e.ctrlKey);
         if( e.ctrlKey && this.keys.includes(e.key)){
             e.preventDefault();
             this.funcs[e.key](e);
