@@ -1,0 +1,41 @@
+{% extends "_base.html" %}
+{% block title %}X{% endblock %}
+{% block css %}
+		<link rel="stylesheet" href="{{url_for('static',filename='css/doodle/x.css')}}"/>
+{% endblock %}
+{% block content %}
+    <div id="main" class="frame" >
+        <div class="contents">
+            <div id="main-left">
+                <div id="info">
+                    <div>概要</div>
+                    <input type="text" value="aaaa">
+                    <textarea>text area</textarea>
+                </div>
+            </div>
+            <div id="main-right">
+                <div id="schedule-controller"></div>
+                <div id="schedule-frame">
+                    <div id="schedule"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="side-contents">
+        <div>INFO</div>
+        <a class="menu">MENU1</a>
+        <a class="menu">MENU1</a>
+        <button>設定</button>
+        <div>
+            <label><input type="radio" name="mode" value="radio1" checked>RADIO1</label><br>
+            <label><input type="radio" name="mode" value="radio2"        >RADIO2</label>
+        </div>
+        <div id="side-info">
+
+        </div>
+    </div>
+{% endblock %}
+
+{% block script %}
+    <script src="{{url_for('static',filename='js/doodle/x.js')}}"></script>
+{% endblock %}

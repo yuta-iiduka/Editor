@@ -1,0 +1,48 @@
+
+#main{
+    height: 100%;
+    width:  100%;
+    display: block;
+}
+
+#main .contents{
+    height: 100%;
+    width:  100%;
+    display: flex;
+    flex-direction: row;
+}
+
+#main-left{
+    height: 100%;
+    width:  240px;
+}
+
+#main-left #info{
+    height: 100%;
+    width:  100%;
+}
+
+#main-right{
+    height: 100%;
+    width: calc(100% - 240px);
+}
+
+#main-right #schedule{
+    height: 100%;
+    width:  100%;
+}
+
+#main-right #schedule-frame{
+    /* 100% - 48 - 2 */
+    height: calc(100% - 50px);
+    width:  100%;
+    border:1px solid grey;
+}
+
+#main-right #schedule-controller{
+    height: 48px;
+    width:  100%;
+    border: 1px solid grey;
+    display: block;
+}
+

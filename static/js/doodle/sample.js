@@ -12,7 +12,8 @@ scheduler.make("3")
 scheduler.make("4")
 scheduler.make("5")
 
-async function init_scheduler(){
+
+function init_scheduler(){
     let pro = new Promise((resolve)=>{console.log("start");resolve();})
     for(let i = 0; i<30; i++){
         scheduler.active_data = i;
@@ -51,5 +52,9 @@ async function confirm_modal(){
         console.log("confirm end.");
 }
 
-init_scheduler();
-scheduler.build()
+new Promise(
+    ()=>{
+        init_scheduler();
+        scheduler.build();
+    }
+)

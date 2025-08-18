@@ -146,7 +146,7 @@ class DOM {
     }
 
     /**
-     * オーバーライド用
+     * オーバーライド用 this.contentsに相当する
      * @returns HTMLElement
      */
     make(){
@@ -216,6 +216,8 @@ class Grid{
         this._height = this.dom.offsetHeight;
         this._fit_event = null;
         this.draw();
+        this.label_strong_color = "lightgreen";
+        this.label_light_color  = "lightblue";
         this.labelX_mode = labelX; // "none","num", "date", "time"
         this.labelsX = this.labelingX();
 
@@ -338,12 +340,13 @@ class Grid{
         lbl.style.display = "block";
         lbl.style.flex = 1;
         lbl.style.textAlign = "center";
-        lbl.style.color = "lightblue";
         lbl.style.fontWeight = "bold";
+        lbl.style.pointerEvents = "none";
         const dt = new DateTime();
         const lst = dt.list(this.x,this.labelX_mode);
         for(let i=0; i<this.x; i++){
             const l = lbl.cloneNode(true);
+            l.style.color = i % 5 == 0 ? this.label_strong_color : this.label_light_color;
             let t = lst[i] ?? "";
             l.textContent = t;
             tmp.push(l);
@@ -361,7 +364,8 @@ class Grid{
         dom.style.backgroundSize = `${w}px ${h}px`;
         dom.style.backgroundPosition = `0% 0%`;
         // dom.style.backgroundImage = `repeating-linear-gradient(90deg,#aaa 0px,#aaa 1px,transparent 1px,transparent ${w}px,red ${w}px,red ${w+1}px,transparent ${w+1}px, transparent ${w*2}px),repeating-linear-gradient(0deg,#aaa,#aaa 1px,transparent 1px,transparent ${h}px)`;
-        dom.style.background = `repeating-linear-gradient(90deg,${this.lineSubColor} 0px,${this.lineColor} 1px,transparent 1px,transparent ${w}px,${this.lineColor} ${w}px,${this.lineColor} ${w+1}px,transparent ${w+1}px,transparent ${w*2}px,${this.lineColor} ${w*2}px,${this.lineColor} ${w*2+1}px,transparent ${w*2+1}px,transparent ${w*3}px,${this.lineColor} ${w*3}px,${this.lineColor} ${w*3+1}px,transparent ${w*3+1}px,transparent ${w*4}px,${this.lineColor} ${w*4}px,${this.lineColor} ${w*4+1}px,transparent ${w*4+1}px,transparent ${w*5}px),repeating-linear-gradient(0deg,${this.lineColor},${this.lineColor} 1px,transparent 1px,transparent ${h}px)`;
+        // dom.style.background = `repeating-linear-gradient(90deg,${this.lineSubColor} 0px,${this.lineColor} 1px,transparent 1px,transparent ${w}px,${this.lineColor} ${w}px,${this.lineColor} ${w+1}px,transparent ${w+1}px,transparent ${w*2}px,${this.lineColor} ${w*2}px,${this.lineColor} ${w*2+1}px,transparent ${w*2+1}px,transparent ${w*3}px,${this.lineColor} ${w*3}px,${this.lineColor} ${w*3+1}px,transparent ${w*3+1}px,transparent ${w*4}px,${this.lineColor} ${w*4}px,${this.lineColor} ${w*4+1}px,transparent ${w*4+1}px,transparent ${w*5}px),repeating-linear-gradient(0deg,${this.lineColor},${this.lineColor} 1px,transparent 1px,transparent ${h}px)`;
+        dom.style.backgroundImage = `repeating-linear-gradient(90deg,${this.lineSubColor} 0px,${this.lineColor} 1px,transparent 1px,transparent ${w}px,${this.lineColor} ${w}px,${this.lineColor} ${w+1}px,transparent ${w+1}px,transparent ${w*2}px,${this.lineColor} ${w*2}px,${this.lineColor} ${w*2+1}px,transparent ${w*2+1}px,transparent ${w*3}px,${this.lineColor} ${w*3}px,${this.lineColor} ${w*3+1}px,transparent ${w*3+1}px,transparent ${w*4}px,${this.lineColor} ${w*4}px,${this.lineColor} ${w*4+1}px,transparent ${w*4+1}px,transparent ${w*5}px),repeating-linear-gradient(0deg,${this.lineColor},${this.lineColor} 1px,transparent 1px,transparent ${h}px)`;
         
         // オブジェクトの描画
         for(let o of this.objects){
@@ -2320,8 +2324,8 @@ class SideMenu extends DOM {
         this.css = this.style();
         this.btn_op = null;
         this.btn_cl = null;
+        this.btnbar = null;
         this.zIndex = SideMenu.CONST.ZINDEX; /** ここの調整はContextMenu優先か、SideMenu優先か */
-        
         SideMenu.list.push(this);
     }
 
@@ -2435,10 +2439,7 @@ class SideMenu extends DOM {
         this.main = DOM.create("div",{class:"contents"});
         elm.appendChild(btnbar);
         elm.appendChild(this.main);
-
-        const self = this;
-        const disable = "disable";
-        let mode = "close";
+        this.mode = "close";
         // this.btn_op.addEventListener("click",function(){
         //     self.btn_op.classList.add(disable);
         //     self.btn_cl.classList.remove(disable);
@@ -2451,21 +2452,34 @@ class SideMenu extends DOM {
         //     elm.classList.remove("active");
         //     mode = "close";
         // });
-        btnbar.addEventListener("click",function(){
-            if(mode === "close"){
-                self.btn_op.classList.add(disable);
-                self.btn_cl.classList.remove(disable);
-                elm.classList.add("active");
-                mode = "open";
+        btnbar.addEventListener("click",()=>{
+            if(this.mode === "close"){
+                this.show();
             }else{
-                self.btn_op.classList.remove(disable);
-                self.btn_cl.classList.add(disable);
-                elm.classList.remove("active");
-                mode = "close";
+                this.hide();
             }
-        })
+        });
+        this.btnbar = btnbar;
 
         return elm
+    }
+
+    show(){
+        const disable = "disable";
+        this.btn_op.classList.add(disable);
+        this.btn_cl.classList.remove(disable);
+        this.contents.classList.add("active");
+        this.mode = "open";
+        return this;
+    }
+
+    hide(){
+        const disable = "disable";
+        this.btn_op.classList.remove(disable);
+        this.btn_cl.classList.add(disable);
+        this.contents.classList.remove("active");
+        this.mode = "close";
+        return this;
     }
 
     build(dom){
@@ -2707,6 +2721,8 @@ class Scheduler{
 
         // グリッド描画の初期化(x:1440+見出し)
         this.grid = new GridFixLocal(1441,64,128,64,selector,"minute");
+        console.log("position",`${this.grid.w * this.ratio.margin_labelX}px 0px`);
+        this.dom.style.backgroundPosition = `${this.grid.w * this.ratio.margin_labelX}px 0px`;
         this.dom.style.width  = `${this.grid.w * this.grid.x}px`;
         this.dom.style.height = `${this.grid.h * this.grid.y}px`;
 
@@ -2721,6 +2737,7 @@ class Scheduler{
         this.contextmenu.append("検索",()=>{this.find();});
         this.contextmenu.append("次の検索結果",()=>{this.findNext(this.target);});
         this.contextmenu.append("前の検索結果",()=>{this.findBack(this.target);});
+        this.contextmenu.append("全選択",()=>{this.selectAll()});
         this.contextmenu.build();
 
         // ショートカットの初期化
@@ -2737,6 +2754,7 @@ class Scheduler{
         this.shortcut.append("b",()=>{this.findBack(this.target)});
         this.shortcut.append("ArrowDown",()=>{this.findBack(this.target)});
         this.shortcut.append("ArrowLeft",()=>{this.findBack(this.target)});
+        this.shortcut.append("a",()=>{this.selectAll()});
         this.shortcut.build();
 
         // マウスの場所を登録する処理を追加
@@ -2751,7 +2769,7 @@ class Scheduler{
         this.find_mdl = new Modal()
             .set_title("検索")
             .set_yes_btn(()=>{},"OK")
-            .set_no_btn(()=>{},"キャンセル");
+            .set_no_btn (()=>{},"キャンセル");
         this.find_mdl.show_event = ()=>{this.find_mdl.body.querySelector("input").focus()};
 
 
@@ -2952,6 +2970,56 @@ class Scheduler{
         const b = new Block(p.x,p.y,p.z,p.w,p.h).wrap(selector);
         this.append(b);
         return b;
+    }
+
+    /** 特定のブロックの前にあるブロックを取得する */
+    before(b){
+        let target = null;
+        const m = this.map;
+        const row = m[b.p.y];
+        const befores = row.slice(1,b.p.x);  //item列はのぞくので、０ではなく、１からスタート
+        for(let blocks of befores.reverse()){
+            if(blocks.length > 1){
+                    this.emdl.show("直前のブロックの候補が複数あります。");
+                    target =  null;
+                    break;
+            }else{
+                for(let block of blocks){
+                    target = block;
+                    break;
+                }
+            }
+
+            if(target){
+                break;
+            }
+        }
+        return target;
+    }
+
+    /** 特定のブロックの後ろにあるブロックを取得する */
+    after(b){
+        let target = null;
+        const m = this.map;
+        const row = m[b.p.y];
+        const befores = row.slice(b.p.x + b.p.w);  //item列はのぞくので、０ではなく、１からスタート
+        for(let blocks of befores){
+            if(blocks.length > 1){
+                    this.emdl.show("直後のブロックの候補が複数あります。");
+                    target =  null;
+                    break;
+            }else{
+                for(let block of blocks){
+                    target = block;
+                    break;
+                }
+            }
+
+            if(target){
+                break;
+            }
+        }
+        return target;
     }
 
     filterable(){
@@ -3367,6 +3435,153 @@ class ShortCutAlt extends ShortCut{
             e.preventDefault();
         }
     }
+}
+
+class PopCard extends DOM{
+    static style = null;
+
+    constructor(selector="body"){
+        super(selector);
+        this.top = 24;
+        this.height = 64;
+        this.width  = 240;
+
+        this.head = null;
+        this.body = null;
+        this.foot = null;
+        this._title = null;
+        this._close_btn = null;
+        this.timeout = 3000;
+        this.active = false;
+        this.zIndex = 10;
+        this.index();
+        this._click = null;
+        this._contextmenu = null;
+    }
+
+    click(func){
+        if(typeof(func)==="function"){
+            this._click = func;
+        }
+        return this;
+    }
+
+    make(){
+        const elm = DOM.create("div",{class:"popcard"});
+        this.head = DOM.create("div",{class:"popcard-head"});
+        this.body = DOM.create("div",{class:"popcard-body"});
+        this.foot = DOM.create("div",{class:"popcard-foot"});
+
+        this._title     = DOM.create("span",{class:"popcard-title"});
+        this._title.textContent = "title";
+        this._close_btn = DOM.create("span",{class:"popcard-close"});
+        this._close_btn.textContent = "×";
+        this._close_btn.addEventListener("click",()=>{
+            this.hide();
+        })
+        this.head.appendChild(this._title);
+        this.head.appendChild(this._close_btn);
+        
+        this.body.addEventListener("click",()=>{
+            if(typeof(this._click) === "function"){this._click();}
+            this.hide();
+        });
+
+        elm.appendChild(this.head);
+        elm.appendChild(this.body);
+        elm.appendChild(this.foot);
+        
+        return elm;
+    }
+
+    style(){
+        return PopCard.style ?? new Style(`
+            .frame-${this.type()}{
+                position:fixed;
+                width:${this.width}px;
+                height:${this.height}px;
+                border: 1px solid grey;
+                border-radius: 3px;
+                color:white;
+                background-color:black;
+                left: 100vw;
+                top:  ${this.top}px;
+                z-index:${this.zIndex};
+                transition: left 0.5s;
+            }
+            .frame-${this.type()}.active{
+                /* 100% - 240body -2border -16px */
+                left: calc(100vw - 258px);
+            }
+            .popcard-head{
+                display:flex;
+                justify-content:space-between;
+                height:24px;
+                background-color:#333333;
+            }
+            .popcard-body{
+                display:block;
+                height:36px;
+                cursor:pointer;
+                padding-left:8px;
+            }
+            .popcard-foot{
+                display:block;
+                width: 0px;
+                height:4px;
+                background-color:white;
+                transition: width ${this.timeout / 1000}s;
+            }
+            .popcard-foot.active{
+                width: ${this.width}px;
+            }
+            .popcard-title{
+                padding-left:4px;
+            }
+            .popcard-close{
+                cursor:pointer;
+            }
+        `).build();
+    }
+
+    build(){
+        super.build();
+        // 非表示で初期化
+        this.hide();
+        this.style();
+        return this;
+    }
+
+    show(t=""){
+        this.active = true;
+        if(t!==""){this.message(t)}
+        const count = PopCard.list.filter((p)=>p.active===true).length;
+        this.frame.style.top = `${this.top + ((this.height + 12 ) * count)}px`;
+        this.frame.classList.add("active");
+        this.foot.classList.add("active");
+        this.stack = setTimeout(()=>{this.hide()},this.timeout);
+        return this;
+    }
+
+    hide(){
+        this.frame.classList.remove("active");
+        this.foot.classList.remove("active");
+        this.active = false;
+        clearTimeout(this.stack);
+        this.stack = null;
+        return this;
+    }
+
+    message(t="message"){
+        this.body.innerHTML = t;
+        return this;
+    }
+
+    title(t="title"){
+        this._title.innerHTML = t;
+        return this;
+    }
+
 }
 
 class DataEditor extends DOM{
