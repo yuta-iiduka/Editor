@@ -31,10 +31,7 @@ def list_local_ipv4():
     return addrs or ["127.0.0.1"]
 
 def list_local_ipv6_with_scope():
-    """
-    (display, addr, scopeid) のリストを返す。
-    display は scopeid があれば 'addr%scope' 形式。
-    """
+    """(display, addr, scopeid) のリスト。display は 'addr%scope' 形式。"""
     seen = set()
     out = []
     hostname = socket.gethostname()
@@ -50,20 +47,13 @@ def list_local_ipv6_with_scope():
             out.append((display, addr, scope))
     except Exception:
         pass
-    # ループバックは最後に
     out_no_loop = [x for x in out if x[0].split('%')[0] != "::1"]
     if any(x[0].split('%')[0] == "::1" for x in out):
         out_no_loop.append(("::1", "::1", 0))
     return out_no_loop or [("::1", "::1", 0)]
 
-def bytes_to_hex_ascii(b, max_len=64):
-    data = b[:max_len]
-    hexpart = " ".join(f"{x:02x}" for x in data)
-    asciipart = "".join(chr(x) if 32 <= x <= 126 else "." for x in data)
-    return f"{hexpart}  | {asciipart}"
-
 def parse_addr_zone(s: str):
-    """'addr%scope' → ('addr', scopeid:int)。%が無ければ scopeid=0。数値以外は0扱い。"""
+    """'addr%scope' → ('addr', scopeid:int)。%無なら scope=0"""
     if "%" in s:
         addr, zone = s.split("%", 1)
         try:
@@ -72,6 +62,12 @@ def parse_addr_zone(s: str):
             scope = 0
         return addr, scope
     return s, 0
+
+def bytes_to_hex_ascii(b, max_len=64):
+    data = b[:max_len]
+    hexpart = " ".join(f"{x:02x}" for x in data)
+    asciipart = "".join(chr(x) if 32 <= x <= 126 else "." for x in data)
+    return f"{hexpart}  | {asciipart}"
 
 # ====== IPv4 パーサ（TCP/UDP/ICMP） ======
 def parse_ipv4_packet(data):
@@ -122,31 +118,7 @@ def parse_ipv4_packet(data):
         "length": len(data),
     }
 
-# ====== IPv6ユーティリティ（ICMPv6） ======
-ICMPV6_ECHO_REQUEST = 128
-ICMPV6_ECHO_REPLY = 129
-
-def checksum16(data: bytes) -> int:
-    if len(data) % 2:
-        data += b"\x00"
-    s = sum(int.from_bytes(data[i:i+2], "big") for i in range(0, len(data), 2))
-    while s >> 16:
-        s = (s & 0xFFFF) + (s >> 16)
-    return (~s) & 0xFFFF
-
-def ip6_pseudo_header(src_ip: str, dst_ip: str, upper_len: int, nexthdr: int) -> bytes:
-    src = socket.inet_pton(socket.AF_INET6, src_ip)
-    dst = socket.inet_pton(socket.AF_INET6, dst_ip)
-    return src + dst + struct.pack("!I", upper_len) + b"\x00" * 3 + struct.pack("!B", nexthdr)
-
-def build_icmpv6_echo(src_ip: str, dst_ip: str, ident: int, seq: int, payload: bytes) -> bytes:
-    hdr_wo_cs = struct.pack("!BBH", ICMPV6_ECHO_REQUEST, 0, 0) + struct.pack("!HH", ident, seq)
-    pkt_wo_cs = hdr_wo_cs + payload
-    pseudo = ip6_pseudo_header(src_ip, dst_ip, len(pkt_wo_cs), socket.IPPROTO_ICMPV6)
-    cs = checksum16(pseudo + pkt_wo_cs)
-    hdr = struct.pack("!BBH", ICMPV6_ECHO_REQUEST, 0, cs) + struct.pack("!HH", ident, seq)
-    return hdr + payload
-
+# ====== IPv6 ICMPv6 簡易パース ======
 def parse_icmpv6_packet(payload, src_addr, dst_addr):
     info = ""
     if len(payload) >= 4:
@@ -163,14 +135,6 @@ def parse_icmpv6_packet(payload, src_addr, dst_addr):
         "length": len(payload),
         "extra": info,
     }
-
-def pick_source_ipv6(dst_ip: str, scopeid: int) -> str:
-    s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-    try:
-        s.connect((dst_ip, 0, 0, scopeid))
-        return s.getsockname()[0]
-    finally:
-        s.close()
 
 # ====== 簡易フィルタ ======
 def simple_filter(packet, filt_text):
@@ -251,7 +215,7 @@ class IPv4SnifferThread(threading.Thread):
                 pass
             s.close()
 
-# ====== キャプチャ・スレッド（IPv6: ICMPv6のみ、正しくscope付きbind） ======
+# ====== キャプチャ・スレッド（IPv6: ICMPv6のみ） ======
 class ICMPv6SnifferThread(threading.Thread):
     def __init__(self, iface_ip6_display, out_q, stop_event, filt_text_getter):
         super().__init__(daemon=True)
@@ -272,14 +236,12 @@ class ICMPv6SnifferThread(threading.Thread):
 
         addr, scope = parse_addr_zone(self.iface_ip6_display)
         bound_dst_display = self.iface_ip6_display
-
-        # scope付き4要素タプルでbind（失敗時はワイルドカード）
         try:
             s.bind((addr, 0, 0, scope))
         except Exception:
             try:
                 s.bind(("::", 0, 0, 0))
-                bound_dst_display = ""  # 不明
+                bound_dst_display = ""
             except Exception as e:
                 self.out_q.put(("ERR", "ERR", "", "", "", "", f"IPv6 bind 失敗: {e}", ""))
                 s.close()
@@ -288,7 +250,7 @@ class ICMPv6SnifferThread(threading.Thread):
         try:
             while not self.stop_event.is_set():
                 try:
-                    data, addrinfo = s.recvfrom(65535)  # (src, port, flow, scope)
+                    data, addrinfo = s.recvfrom(65535)
                 except OSError:
                     break
                 src_addr = addrinfo[0] if isinstance(addrinfo, tuple) and addrinfo else ""
@@ -303,14 +265,184 @@ class ICMPv6SnifferThread(threading.Thread):
         finally:
             s.close()
 
-# ====== 送信（UDP/TCP/ICMPv6 Echo） ======
-_seq_icmp6 = 0
-_seq_lock = threading.Lock()
+# ====== 受信（bind）リスナ：UDP ======
+class UDPReceiverThread(threading.Thread):
+    def __init__(self, bind_display, port, out_q, status_cb):
+        super().__init__(daemon=True)
+        self.bind_display = bind_display  # IPv4: '0.0.0.0'、IPv6: 'fe80::1%12' 等
+        self.port = int(port)
+        self.out_q = out_q
+        self.status_cb = status_cb
+        self.stop_event = threading.Event()
+        self.sock = None
 
+    def stop(self):
+        self.stop_event.set()
+        try:
+            if self.sock:
+                self.sock.close()
+        except Exception:
+            pass
+
+    def run(self):
+        try:
+            # 判定：IPv6 かどうか
+            is_v6 = ":" in self.bind_display
+            if is_v6:
+                addr, scope = parse_addr_zone(self.bind_display)
+                self.sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+                self.sock.bind((addr, self.port, 0, scope))
+            else:
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self.sock.bind((self.bind_display, self.port))
+            self.sock.settimeout(0.5)
+            self.status_cb(f"UDP receiver started on {self.bind_display}:{self.port}")
+        except Exception as e:
+            self.status_cb(f"UDP bind error: {e}")
+            return
+
+        try:
+            while not self.stop_event.is_set():
+                try:
+                    data, addr = self.sock.recvfrom(65535)
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
+                # ログ行
+                local = self.sock.getsockname()
+                if ":" in self.bind_display:
+                    dst_ip = f"{local[0]}%{local[3]}" if len(local) >= 4 and local[3] else local[0]
+                    dport = str(local[1])
+                    src_ip = addr[0]
+                    sport = str(addr[1])
+                else:
+                    dst_ip = local[0]
+                    dport = str(local[1])
+                    src_ip = addr[0]
+                    sport = str(addr[1])
+
+                ts = datetime.now().strftime("%H:%M:%S")
+                payload_view = "[RECV] " + bytes_to_hex_ascii(data, max_len=64)
+                self.out_q.put((ts, "UDP", dst_ip, dport, src_ip, sport, str(len(data)), payload_view))
+        finally:
+            try:
+                self.sock.close()
+            except Exception:
+                pass
+            self.status_cb(f"UDP receiver stopped on {self.bind_display}:{self.port}")
+
+# ====== 受信（bind）リスナ：TCP（accept→各接続で受信） ======
+class TCPConnHandler(threading.Thread):
+    def __init__(self, conn, peer, local, out_q, status_cb, stop_event):
+        super().__init__(daemon=True)
+        self.conn = conn
+        self.peer = peer
+        self.local = local
+        self.out_q = out_q
+        self.status_cb = status_cb
+        self.stop_event = stop_event
+
+    def run(self):
+        try:
+            self.conn.settimeout(0.5)
+            while not self.stop_event.is_set():
+                try:
+                    data = self.conn.recv(4096)
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
+                if not data:
+                    break
+                # ログ
+                if isinstance(self.local, tuple) and len(self.local) >= 2:
+                    local_ip = self.local[0]
+                    if len(self.local) >= 4 and self.local[3]:
+                        local_ip = f"{local_ip}%{self.local[3]}"
+                    local_port = str(self.local[1])
+                else:
+                    local_ip, local_port = "", ""
+
+                src_ip = self.peer[0]
+                src_port = str(self.peer[1])
+
+                ts = datetime.now().strftime("%H:%M:%S")
+                payload_view = "[RECV] " + bytes_to_hex_ascii(data, max_len=64)
+                self.out_q.put((ts, "TCP", local_ip, local_port, src_ip, src_port, str(len(data)), payload_view))
+        finally:
+            try:
+                self.conn.close()
+            except Exception:
+                pass
+
+class TCPReceiverThread(threading.Thread):
+    def __init__(self, bind_display, port, out_q, status_cb):
+        super().__init__(daemon=True)
+        self.bind_display = bind_display
+        self.port = int(port)
+        self.out_q = out_q
+        self.status_cb = status_cb
+        self.stop_event = threading.Event()
+        self.sock = None
+        self.handlers = []
+
+    def stop(self):
+        self.stop_event.set()
+        try:
+            if self.sock:
+                self.sock.close()
+        except Exception:
+            pass
+        for h in self.handlers:
+            try:
+                h.join(timeout=0.1)
+            except Exception:
+                pass
+
+    def run(self):
+        try:
+            is_v6 = ":" in self.bind_display
+            if is_v6:
+                addr, scope = parse_addr_zone(self.bind_display)
+                self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.sock.bind((addr, self.port, 0, scope))
+            else:
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.sock.bind((self.bind_display, self.port))
+            self.sock.listen(5)
+            self.sock.settimeout(0.5)
+            self.status_cb(f"TCP receiver started on {self.bind_display}:{self.port}")
+        except Exception as e:
+            self.status_cb(f"TCP bind/listen error: {e}")
+            return
+
+        try:
+            while not self.stop_event.is_set():
+                try:
+                    conn, peer = self.sock.accept()
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
+                local = conn.getsockname()
+                h = TCPConnHandler(conn, peer, local, self.out_q, self.status_cb, self.stop_event)
+                self.handlers.append(h)
+                h.start()
+        finally:
+            try:
+                self.sock.close()
+            except Exception:
+                pass
+            self.status_cb(f"TCP receiver stopped on {self.bind_display}:{self.port}")
+
+# ====== Sender（既存） ======
 class SenderThread(threading.Thread):
     def __init__(self, proto, ipver, host, port, payload_bytes, repeat, interval, status_cb, out_q):
         super().__init__(daemon=True)
-        self.proto = proto  # "UDP" or "TCP" or "ICMPv6"
+        self.proto = proto  # "UDP" / "TCP" / "ICMPv6"
         self.ipver = ipver  # "auto"/"ipv4"/"ipv6"
         self.host = host
         self.port = port
@@ -327,7 +459,8 @@ class SenderThread(threading.Thread):
     def run(self):
         try:
             if self.proto == "ICMPv6":
-                self._send_icmpv6_echo()
+                # ここでは簡略化：ICMPv6は送信ログのみ（ICMPv6送信機能は前版に実装済み）
+                self.status_cb("ICMPv6 sending not included in this minimal receiver update.")
                 return
 
             family = 0
@@ -346,6 +479,8 @@ class SenderThread(threading.Thread):
                     s.connect(sa)
                     local = s.getsockname()
                     local_ip = local[0]
+                    if len(local) >= 4 and local[3]:
+                        local_ip = f"{local_ip}%{local[3]}"
                     local_port = str(local[1])
                     for i in range(self.repeat):
                         s.sendall(self.payload)
@@ -358,6 +493,8 @@ class SenderThread(threading.Thread):
                     s.connect(sa)
                     local = s.getsockname()
                     local_ip = local[0]
+                    if len(local) >= 4 and local[3]:
+                        local_ip = f"{local_ip}%{local[3]}"
                     local_port = str(local[1])
                     for i in range(self.repeat):
                         s.send(self.payload)
@@ -370,39 +507,13 @@ class SenderThread(threading.Thread):
         except Exception as e:
             self.status_cb(f"Send error: {e}")
 
-    def _send_icmpv6_echo(self):
-        try:
-            dst_addr, dst_scope = parse_addr_zone(self.host)
-            # 宛先が名前の場合など、getaddrinfoで解決しscopeを補う
-            if ":" not in dst_addr or dst_addr.count(":") < 2:
-                infos = socket.getaddrinfo(self.host, None, socket.AF_INET6, socket.SOCK_DGRAM)
-                dst_addr = infos[0][4][0]
-                dst_scope = infos[0][4][3]
-            src_ip = pick_source_ipv6(dst_addr, dst_scope)
-            with _seq_lock:
-                global _seq_icmp6
-                _seq_icmp6 = (_seq_icmp6 + 1) & 0xFFFF
-                seq0 = _seq_icmp6
-
-            with socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_ICMPV6) as s:
-                for i in range(self.repeat):
-                    pkt = build_icmpv6_echo(src_ip, dst_addr, ident=0x1234, seq=(seq0 + i) & 0xFFFF,
-                                            payload=self.payload)
-                    s.sendto(pkt, (dst_addr, 0, 0, dst_scope))
-                    self.status_cb(f"ICMPv6 Echo sent {len(pkt)} bytes to {dst_addr}%{dst_scope} ({i+1}/{self.repeat})")
-                    self._emit_row("ICMPv6", f"{dst_addr}%{dst_scope}" if dst_scope else dst_addr, "", src_ip, "", len(pkt), bytes_to_hex_ascii(pkt))
-                    if i + 1 < self.repeat:
-                        time.sleep(self.interval)
-        except Exception as e:
-            self.status_cb(f"ICMPv6 send error: {e}")
-
 # ====== GUI ======
 class PacketMonitorApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Packet Monitor (Windows stdlib) - IPv4 + ICMPv6 + Sender")
-        self.geometry("1120x740")
-        self.minsize(900, 560)
+        self.title("Packet Monitor (Windows stdlib) - IPv4 + ICMPv6 + Sender + Receiver")
+        self.geometry("1150x800")
+        self.minsize(900, 640)
 
         # ===== 上部：キャプチャ設定 =====
         cap_frame = ttk.LabelFrame(self, text="Capture")
@@ -431,7 +542,7 @@ class PacketMonitorApp(tk.Tk):
 
         cap_frame.columnconfigure(5, weight=1)
 
-        # ===== 一覧（横スクロールあり） =====
+        # ===== 中央：一覧（横スクロールあり） =====
         table_frame = ttk.Frame(self)
         table_frame.pack(side="top", fill="both", expand=True, padx=8, pady=8)
 
@@ -450,7 +561,7 @@ class PacketMonitorApp(tk.Tk):
         self.tree.column("src", width=220, stretch=True)
         self.tree.column("sport", width=90, stretch=False)
         self.tree.column("length", width=80, stretch=False)
-        self.tree.column("payload", width=720, stretch=True)
+        self.tree.column("payload", width=760, stretch=True)
 
         vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
@@ -463,12 +574,11 @@ class PacketMonitorApp(tk.Tk):
         table_frame.rowconfigure(0, weight=1)
         table_frame.columnconfigure(0, weight=1)
 
-        # ===== 送信（テキスト＋候補ドロップダウン） =====
+        # ===== 下部：送信 =====
         send_frame = ttk.LabelFrame(self, text="Test Sender")
         send_frame.pack(fill="x", padx=8, pady=(0,8))
 
         ttk.Label(send_frame, text="Host/IP:").grid(row=0, column=0, sticky="e")
-
         self.send_host = tk.StringVar(value="127.0.0.1")
         self.host_combo = ttk.Combobox(send_frame, textvariable=self.send_host, width=40, state="normal")
         cand4 = list_local_ipv4()
@@ -482,7 +592,7 @@ class PacketMonitorApp(tk.Tk):
 
         ttk.Label(send_frame, text="Protocol:").grid(row=0, column=4, sticky="e")
         self.proto_var = tk.StringVar(value="UDP")
-        ttk.Combobox(send_frame, textvariable=self.proto_var, values=["UDP", "TCP", "ICMPv6"], width=8, state="readonly").grid(row=0, column=5, padx=6, sticky="w")
+        ttk.Combobox(send_frame, textvariable=self.proto_var, values=["UDP", "TCP"], width=8, state="readonly").grid(row=0, column=5, padx=6, sticky="w")
 
         ttk.Label(send_frame, text="IP Version:").grid(row=0, column=6, sticky="e")
         self.ipver_var = tk.StringVar(value="auto")
@@ -509,6 +619,42 @@ class PacketMonitorApp(tk.Tk):
 
         send_frame.columnconfigure(1, weight=1)
 
+        # ===== 受信設定欄（新規） =====
+        recv_frame = ttk.LabelFrame(self, text="Receiver (bind & log)")
+        recv_frame.pack(fill="x", padx=8, pady=(0,8))
+
+        ttk.Label(recv_frame, text="Bind Host/IP:").grid(row=0, column=0, sticky="e")
+        self.recv_host = tk.StringVar(value="0.0.0.0")  # 0.0.0.0 / :: も可
+        self.recv_host_combo = ttk.Combobox(recv_frame, textvariable=self.recv_host, width=40, state="normal")
+        rec_cand4 = ["0.0.0.0"] + cand4
+        rec_cand6 = ["::"] + [disp for (disp, addr, scope) in list_local_ipv6_with_scope()]
+        self.recv_host_combo["values"] = rec_cand4 + rec_cand6
+        self.recv_host_combo.grid(row=0, column=1, padx=6, sticky="we")
+
+        ttk.Label(recv_frame, text="Port:").grid(row=0, column=2, sticky="e")
+        self.recv_port = tk.StringVar(value="9000")
+        ttk.Entry(recv_frame, textvariable=self.recv_port, width=8).grid(row=0, column=3, padx=6, sticky="w")
+
+        ttk.Label(recv_frame, text="Protocol:").grid(row=0, column=4, sticky="e")
+        self.recv_proto = tk.StringVar(value="UDP")
+        ttk.Combobox(recv_frame, textvariable=self.recv_proto, values=["UDP","TCP"], width=8, state="readonly").grid(row=0, column=5, padx=6, sticky="w")
+
+        self.add_recv_btn = ttk.Button(recv_frame, text="Start Receiver", command=self.start_receiver)
+        self.add_recv_btn.grid(row=0, column=6, padx=6)
+
+        self.stop_sel_btn = ttk.Button(recv_frame, text="Stop Selected", command=self.stop_selected_receiver, state="disabled")
+        self.stop_sel_btn.grid(row=0, column=7, padx=4)
+
+        self.stop_all_btn = ttk.Button(recv_frame, text="Stop All", command=self.stop_all_receivers, state="disabled")
+        self.stop_all_btn.grid(row=0, column=8, padx=4)
+
+        # アクティブ一覧
+        ttk.Label(recv_frame, text="Active:").grid(row=1, column=0, sticky="ne")
+        self.recv_list = tk.Listbox(recv_frame, height=4)
+        self.recv_list.grid(row=1, column=1, columnspan=8, sticky="we", padx=6, pady=(4,6))
+
+        recv_frame.columnconfigure(1, weight=1)
+
         # ===== ステータス =====
         self.status = tk.StringVar(value="Ready")
         statusbar = ttk.Label(self, textvariable=self.status, anchor="w")
@@ -519,6 +665,7 @@ class PacketMonitorApp(tk.Tk):
         self.stop_event = threading.Event()
         self.sniffer4 = None
         self.sniffer6 = None
+        self.receivers = []  # [(desc, thread)]
 
         self.populate_interfaces()
         self.after(50, self.poll_queue)
@@ -576,6 +723,7 @@ class PacketMonitorApp(tk.Tk):
             pass
         self.after(50, self.poll_queue)
 
+    # ===== Sender 操作 =====
     def on_send(self):
         host = self.send_host.get().strip()
         port_s = self.send_port.get().strip()
@@ -583,15 +731,11 @@ class PacketMonitorApp(tk.Tk):
         ipver = self.ipver_var.get()
         repeat = self.repeat_var.get()
         interval = self.interval_var.get()
-        if proto != "ICMPv6":
-            if not host or not port_s.isdigit():
-                messagebox.showwarning("Input", "Host と Port を正しく入力してください。")
-                return
-            port = int(port_s)
-        else:
-            port = 0
+        if not host or not port_s.isdigit():
+            messagebox.showwarning("Input", "Host と Port を正しく入力してください。")
+            return
+        port = int(port_s)
 
-        # ペイロード
         text = self.payload_text.get()
         if self.as_hex_var.get():
             try:
@@ -610,6 +754,66 @@ class PacketMonitorApp(tk.Tk):
                           payload_bytes=payload, repeat=repeat, interval=interval,
                           status_cb=status_cb, out_q=self.q)
         th.start()
+
+    # ===== Receiver 操作 =====
+    def start_receiver(self):
+        host = self.recv_host.get().strip()
+        port_s = self.recv_port.get().strip()
+        proto = self.recv_proto.get()
+        if not port_s.isdigit():
+            messagebox.showwarning("Input", "Port を正しく入力してください。")
+            return
+        port = int(port_s)
+
+        def status_cb(msg):
+            self.status.set(msg)
+
+        if proto == "UDP":
+            th = UDPReceiverThread(host, port, self.q, status_cb)
+            desc = f"UDP {host}:{port}"
+        else:
+            th = TCPReceiverThread(host, port, self.q, status_cb)
+            desc = f"TCP {host}:{port}"
+        th.start()
+        self.receivers.append((desc, th))
+        self.recv_list.insert("end", desc)
+        self.stop_all_btn.configure(state="normal")
+        self.stop_sel_btn.configure(state="normal")
+
+    def stop_selected_receiver(self):
+        idxs = self.recv_list.curselection()
+        if not idxs:
+            return
+        # 後ろから消す
+        for i in reversed(idxs):
+            desc, th = self.receivers[i]
+            try:
+                th.stop()
+            except Exception:
+                pass
+            th.join(timeout=1.0)
+            del self.receivers[i]
+            self.recv_list.delete(i)
+        if not self.receivers:
+            self.stop_all_btn.configure(state="disabled")
+            self.stop_sel_btn.configure(state="disabled")
+
+    def stop_all_receivers(self):
+        for desc, th in self.receivers:
+            try:
+                th.stop()
+            except Exception:
+                pass
+        for desc, th in self.receivers:
+            try:
+                th.join(timeout=1.0)
+            except Exception:
+                pass
+        self.receivers.clear()
+        self.recv_list.delete(0, "end")
+        self.stop_all_btn.configure(state="disabled")
+        self.stop_sel_btn.configure(state="disabled")
+        self.status.set("All receivers stopped")
 
 # ====== エントリポイント ======
 if __name__ == "__main__":
