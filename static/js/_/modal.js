@@ -277,6 +277,10 @@ class Modal{
         return this;
     }
 
+    set_trigger(trigger_id){
+        return this.make_trigger(trigger_id);
+    }
+
     make_triggers(trigger_class){
         const self = this;
         const triggers = document.querySelector(`.${trigger_class}`);
@@ -290,6 +294,10 @@ class Modal{
             }
         }
         return this;
+    }
+
+    set_triggers(trigger_class){
+        return this.make_triggers(trigger_class);
     }
 
     set_title(text){
@@ -429,6 +437,67 @@ class ErrorModal extends Modal{
 
     show(message=""){
         this.set_body(this.message_html(message));
+        super.show();
+    }
+}
+
+class Modaless extends Modal{
+    static style = null
+    static mousemove = null;
+    constructor(size="middle"){
+        super(size)
+        this.moving = false;
+        Modaless.style = Modaless.style ?? this.style();
+        if(Modaless.mousemove === null){
+            this.head.addEventListener("mousedown",(e)=>{this.start(e)});
+            document.addEventListener("mousemove",(e)=>{this.move(e)});
+            document.addEventListener("mouseup",(e)=>{this.stop(e)});
+        } 
+        Modaless.mousemove = Modaless.mousemove ?? this.move;
+    }
+
+    style(){
+        return new Style(`
+            .modal.movable{
+                // 移動中のデザイン
+                border: 1px solid yellow;
+            }
+            .modal_head{
+                cursor:grab;
+            }
+            .modal_head.movable{
+                cursor:grabbing;
+            }
+        `);
+    }
+
+    start(e){
+        this.moving = true;
+        const [rec] = this.frame.getClientRects();
+        this.p = {pageX:e.pageX,pageY:e.pageY,x:rec.left,y:rec.top};
+        this.frame.classList.add("movable");
+        this.head.classList.add("movable");
+    }
+
+    move(e){
+        if(this.moving){
+            const x = this.p.x - (this.p.pageX - e.pageX); 
+            const y = this.p.y - (this.p.pageY - e.pageY);
+            console.log(x,y);
+            this.frame.style.left = `${x}px`;
+            this.frame.style.top  = `${y}px`;
+        }
+    }
+
+    stop(){
+        this.moving = false;
+        this.frame.classList.remove("movable");
+        this.head.classList.remove("movable");
+    }
+
+    show(){
+        this.frame.style.left = ``;
+        this.frame.style.top  = ``;
         super.show();
     }
 }

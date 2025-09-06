@@ -2701,7 +2701,8 @@ class Scheduler{
         },
         RATIO:{
             MARGIN:{
-                LABELX:0.5
+                LABELX:0.5,
+                LABELY:0.0,
             }
         }
     }
@@ -2711,6 +2712,7 @@ class Scheduler{
 
         this.ratio = {
             margin_labelX:Scheduler.CONST.RATIO.MARGIN.LABELX,
+            margin_labelY:Scheduler.CONST.RATIO.MARGIN.LABELY,
         }
 
         this.dom = document.querySelector(selector);
