@@ -38,10 +38,18 @@ class RequestJSON{
           self.error_func(self.res_data);
         }
 			}else{
-        alert("通信に失敗しました。")
+        alert("通信に失敗しました。");
       }
       self.communication = true;
 		}
+    this.xhr.onerror = ()=>{
+      this.communication = false;
+      if(typeof(this.connection_error_func)==="function"){
+        this.connection_error_func();
+      }else{
+        alert("通信に失敗しました。");
+      }
+    }
 		return this;
   }
 
@@ -52,6 +60,11 @@ class RequestJSON{
 
   set_error_func(func){
     this.error_func = func;
+    return this;
+  }
+
+  set_connection_error_func(func){
+    this.connection_error_func = func;
     return this;
   }
 

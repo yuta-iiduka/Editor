@@ -3915,7 +3915,9 @@ class DataEditor extends DOM{
         if(part.dataset.type==="jef-str"){
             tmp = part.querySelector("textarea").value;
         }else if(part.dataset.type==="jef-num"){
-            tmp = JSON.parse(part.querySelector("input").value);
+            let v = part.querySelector("input").value ?? 0;
+            v = v==="" ? 0 : v;
+            tmp = JSON.parse(v);
         }else if(part.dataset.type==="jef-bool"){
             tmp = JSON.parse(part.querySelector("input:checked").parentElement.textContent.toLowerCase());
         }else if(part.dataset.type==="jef-array"){

@@ -17,23 +17,23 @@ class Canvas{
     static mouse = {x:16, y:16};
 
     static{
-        window.addEventListener("resize",function(e){
-            const cl = Canvas.list;
+        window.addEventListener("resize",(e)=>{
+            const cl = this.list;
             for(let c of cl){
-                c.resize(window.innerWidth / Canvas.window.width, window.innerHeight / Canvas.window.height);
+                c.resize(window.innerWidth / this.window.width, window.innerHeight / this.window.height);
                 for(let o of Object.values(c.objects)){
-                    o.resize(window.innerWidth / Canvas.window.width, window.innerHeight / Canvas.window.height);
+                    o.resize(window.innerWidth / this.window.width, window.innerHeight / this.window.height);
                 }
             }
         });
-        document.addEventListener("mouseup",function(){
-            const cl = Canvas.list;
+        document.addEventListener("mouseup",(e)=>{
+            const cl = this.list;
             for(let c of cl){
                 for(let o of c.list){
                     o.draw();
                 }
             }
-        })
+        });
     }
 
     constructor(selector,wrap=false){
@@ -49,6 +49,7 @@ class Canvas{
         this.img_data = null;
         this.mouseX = Canvas.mouse.x;
         this.mouseY = Canvas.mouse.y;
+        [this.base] = this.dom.getClientRects();
         this.objects = {};
         this.list = [];
         this.adjust();
@@ -83,7 +84,7 @@ class Canvas{
     }
 
     get per(){
-        return this._per === undefined || this._per === null ? this._per : "";
+        return this._per === undefined || this._per === null ? Canvas.PER.PERCENT : this._per;
     }
 
     set per(p){
@@ -110,6 +111,11 @@ class Canvas{
 
     get name(){
         return this.constructor.name.toLowerCase();
+    }
+
+    get info(){
+        // return getComputedStyle(this.dom);
+        return this.dom.getClientRects()[0];
     }
 
     /**
@@ -144,8 +150,8 @@ class Canvas{
         // dom.style.height = this.height;
         // dom.style.width = this.width;
 
-        dom.width  = dom.offsetWidth;
-        dom.height = dom.offsetHeight;
+        dom.width  = this.info.width;  // dom.offsetWidth;
+        dom.height = this.info.height; // dom.offsetHeight;
         if(this.img_data !== null){
             this.ctx.putImageData(this.img_data,0,0);
         }
@@ -168,9 +174,10 @@ class Canvas{
     }
 
     resize(ratioW,ratioH){
-        this.width  = this.width  * ratioW;
-        this.height = this.height * ratioH;
+        this.dom.width  = this.base.width  * ratioW;
+        this.dom.height = this.base.height * ratioH;
         this.adjust();
+        // this.draw();
     }
 
     save(){
@@ -183,30 +190,43 @@ class Canvas{
         obj.canvas = this;
         this.objects[obj.id] = obj;
         this.list.push(obj);
-        return this.sort(this.list);
+        return this.sort();
     }
 
     remove(obj){
         delete this.objects[obj.id];
-        this.list = this.list.filter(o => o.id === obj.id);
-        return this.sort(this.list);
+        this.list = this.list.filter(o => o.id !== obj.id);
+        return this.sort();
     }
 
     sort(){
-        this.list = this.list.sort((a,b) => b.z - a.z);
+        this.list = this.list.sort((a,b) => a.z - b.z);
         return this.list;
     }
 
     draw(){
+        // background
+        this.ctx.clearRect(0,0,this.dom.width,this.dom.height);
+
+        // object draw
         for(let o of this.list){
             o.draw();
         }
+
+    }
+
+    /**
+     * 真っさらに戻す
+     */
+    reset(){
+        this.objects = {};
+        this.list = [];
+        this.draw();
     }
 
     init(dom=this.dom){
-        const self = this;
-        dom.addEventListener("click",function(e){
-            for(let o of self.list){
+        dom.addEventListener("click",(e)=>{
+            for(let o of this.list){
                 console.log(o.isMouseOver(e));
                 if(o.isMouseOver(e)){
                     typeof(o.click) === "function" ? o.click(e) : null;
@@ -214,9 +234,9 @@ class Canvas{
                 }
             }
         });
-        dom.addEventListener("contextmenu",function(e){
+        dom.addEventListener("contextmenu",(e)=>{
             console.log(e.offsetX,e.offsetY);
-            for(let o of self.list){
+            for(let o of this.list){
                 console.log(o.isMouseOver(e));
                 if(o.isMouseOver(e)){
                     typeof(o.contextmenu) === "function" ? o.contextmenu(e) : null;
@@ -224,8 +244,8 @@ class Canvas{
                 }
             }
         });
-        dom.addEventListener("mousemove",function(e){
-            for(let o of self.list){
+        dom.addEventListener("mousemove",(e)=>{
+            for(let o of this.list){
                 if(o.isMouseOver(e)){
                     typeof(o.mousemove) === "function" ? o.mousemove(e) : null;
                     o.is_focused = true;
@@ -237,10 +257,10 @@ class Canvas{
                         break;
                     }
                 }
-            }        
+            }
         });
-        dom.addEventListener("mouseout",function(e){
-            for(let o of self.list){
+        dom.addEventListener("mouseout",(e)=>{
+            for(let o of this.list){
                 o.is_focused = false;
                 typeof(o.mouseout) === "function" ? o.mouseout(e) : null;
             }
@@ -252,6 +272,7 @@ class Canvas{
 
 class CanvasObject{
     static cnt = 0;
+    static list = [];
 
     static isCollide(o1,o2){
         if(o1 === o2 || o1.is_active === false || o2.is_active === false){ return false;}
@@ -270,12 +291,19 @@ class CanvasObject{
         this.z = z;
         this.w = w;
         this.h = h;
+        this.b = {x:this.x,y:this.y,z:this.z,w:this.w,h:this.w};
         this.option = option;
         this.canvas = null;
         this.is_resize  = true;
         this.is_active  = true;
         this.is_visible = true;
         this.is_focused = false;
+
+        this.append(this);
+    }
+
+    get p(){
+        return {x:this.x,y:this.y,z:this.z,w:this.w,h:this.w};
     }
 
     get left(){
@@ -296,17 +324,18 @@ class CanvasObject{
 
     draw(){
         if(this.is_visible === false){ return; }
-        this.canvas.ctx.beginPath();
-        this.canvas.fillStyle = "black";
+        // this.canvas.ctx.beginPath();
+        this.canvas.ctx.fillStyle = "orange";
         this.canvas.ctx.fillRect(this.x,this.y,this.w,this.h);
         // this.canvas.ctx.strokeRect();
+        console.log("black");
 
     }
 
     resize(ratioW,ratioH){
         if(this.is_resize === false){ return; }
-        this.x = this.x * ratioW;
-        this.y = this.y * ratioH;
+        this.x = this.b.x * ratioW;
+        this.y = this.b.y * ratioH;
         this.draw();
     }
 
@@ -348,6 +377,14 @@ class CanvasObject{
         console.log("mouseout", e.offsetX, e.offsetY);
     }
 
+    remove(){
+        CanvasObject.list = CanvasObject.list.filter((o)=>o!==this);
+    }
+
+    append(){
+        CanvasObject.list.push(this);
+    }
+
 }
 
 class CanvasMouse extends CanvasObject{
@@ -357,7 +394,38 @@ class CanvasMouse extends CanvasObject{
 
     draw(){
         this.canvas.ctx.beginPath();
-        this.canvas.ctx.arc()
+        this.canvas.ctx.arc();
+    }
+}
+
+class CanvasBackGround extends CanvasObject{
+
+    constructor(x=0,y=0,z=0,w=0,h=0,option={}){
+        super(x,y,z,w,h,option);
+    }
+
+    draw(){
+        if(this.is_visible === false){ return; }
+        // this.canvas.ctx.beginPath();
+        this.canvas.ctx.fillStyle = "red";
+        this.canvas.ctx.fillRect(0,0,this.canvas.dom.width,this.canvas.dom.height);
+        console.log("red");
+    }
+}
+
+class CanvasRect extends CanvasObject{
+
+    constructor(x=0,y=0,z=0,w=0,h=0,option={}){
+        super(x,y,z,w,h,option);
+    }
+
+    draw(){
+        if(this.is_visible === false){ return; }
+        this.canvas.ctx.beginPath();
+        this.canvas.ctx.strokeStyle = "green";
+        this.canvas.ctx.rect(this.x,this.y,this.w,this.h);
+        this.canvas.ctx.stroke();
+        console.log("blue");
     }
 }
 
@@ -383,25 +451,24 @@ class Doodle extends Canvas{
 
     build(){
         const canvas = super.build();
-        const self = this;
-        canvas.addEventListener("pointerdown" ,function(e){
-            if(self.is_active === false){return;}
-            e.preventDefault();self.draw_start(e);
+        canvas.addEventListener("pointerdown" ,(e)=>{
+            if(this.is_active === false){return;}
+            e.preventDefault();this.draw_start(e);
         });
-        canvas.addEventListener("pointermove" ,function(e){
-            if(self.is_active === false){return;}
-            e.preventDefault();self.drawing(e);
+        canvas.addEventListener("pointermove" ,(e)=>{
+            if(this.is_active === false){return;}
+            e.preventDefault();this.drawing(e);
         });
-        canvas.addEventListener("pointerup"   ,function(e){
-            if(self.is_active === false){return;}
-            e.preventDefault();self.draw_end(e);
+        canvas.addEventListener("pointerup"   ,(e)=>{
+            if(this.is_active === false){return;}
+            e.preventDefault();this.draw_end(e);
         });
         //ペンタブの挙動を調整するため他のイベントを無効にする
-        canvas.addEventListener("pointercancel",function(e){e.preventDefault();});
-        canvas.addEventListener("touchstart",function(e){e.preventDefault();});
-        canvas.addEventListener("touchmove",function(e){e.preventDefault();});
-        canvas.addEventListener("touchend",function(e){e.preventDefault();});
-        canvas.addEventListener("touchcancel",function(e){e.preventDefault();});
+        canvas.addEventListener("pointercancel",(e)=>{e.preventDefault();});
+        canvas.addEventListener("touchstart",(e)=>{e.preventDefault();});
+        canvas.addEventListener("touchmove",(e)=>{e.preventDefault();});
+        canvas.addEventListener("touchend",(e)=>{e.preventDefault();});
+        canvas.addEventListener("touchcancel",(e)=>{e.preventDefault();});
 
         return canvas;
     }

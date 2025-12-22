@@ -1,11 +1,5 @@
 console.log("modal is called.")
 
-/**
- * TODO
- * modal.css
- * modaless class
- * 
- */
 class Modal{
     static list = [];
     static cnt = 0;
@@ -374,6 +368,45 @@ class Modal{
         return this;
     }
 
+
+    modaless(){
+        this.moving = false;
+        this.c = {x:0,y:0};
+        this.p = {x:0,y:0};
+        [this.rect] = this.frame.getClientRects();
+
+        this.dom.style.pointerEvents ="none";
+        // this.dom.style.position = "absolute";   
+        this.frame.style.pointerEvents = "auto";
+        // this.frame.style.position = "absolute";
+        this.background.style.pointerEvents = "none";
+        this.background.style.opacity = 0;
+
+        this.head.addEventListener("mousedown",(e)=>{
+            this.moving = true;
+            const [rec] = this.frame.getClientRects();
+            this.c.x = rec.left;
+            this.c.y = rec.top;
+            this.p.x = e.clientX;
+            this.p.y = e.clientY;
+            window.getSelection().removeAllRanges();
+        });
+
+        document.addEventListener("mousemove",(e)=>{
+            if(this.moving){
+                [this.rect] = this.frame.getClientRects();
+                this.frame.style.left = `${this.c.x - (this.p.x - e.clientX)}px`;
+                this.frame.style.top  = `${this.c.y - (this.p.y - e.clientY)}px`;
+                window.getSelection().removeAllRanges();
+            }
+        });
+
+        document.addEventListener("mouseup",(e)=>{
+            this.moving = false;
+        });
+
+        return this;
+    }
 }
 
 class ConfirmModal extends Modal{
@@ -446,60 +479,9 @@ class Modaless extends Modal{
     static mousemove = null;
     constructor(size="middle"){
         super(size)
-        this.moving = false;
-        Modaless.style = Modaless.style ?? this.style();
-        if(Modaless.mousemove === null){
-            this.head.addEventListener("mousedown",(e)=>{this.start(e)});
-            document.addEventListener("mousemove",(e)=>{this.move(e)});
-            document.addEventListener("mouseup",(e)=>{this.stop(e)});
-        } 
-        Modaless.mousemove = Modaless.mousemove ?? this.move;
+        this.modaless();
     }
-
-    style(){
-        return new Style(`
-            .modal.movable{
-                // 移動中のデザイン
-                border: 1px solid yellow;
-            }
-            .modal_head{
-                cursor:grab;
-            }
-            .modal_head.movable{
-                cursor:grabbing;
-            }
-        `);
-    }
-
-    start(e){
-        this.moving = true;
-        const [rec] = this.frame.getClientRects();
-        this.p = {pageX:e.pageX,pageY:e.pageY,x:rec.left,y:rec.top};
-        this.frame.classList.add("movable");
-        this.head.classList.add("movable");
-    }
-
-    move(e){
-        if(this.moving){
-            const x = this.p.x - (this.p.pageX - e.pageX); 
-            const y = this.p.y - (this.p.pageY - e.pageY);
-            console.log(x,y);
-            this.frame.style.left = `${x}px`;
-            this.frame.style.top  = `${y}px`;
-        }
-    }
-
-    stop(){
-        this.moving = false;
-        this.frame.classList.remove("movable");
-        this.head.classList.remove("movable");
-    }
-
-    show(){
-        this.frame.style.left = ``;
-        this.frame.style.top  = ``;
-        super.show();
-    }
+    
 }
 
 // new Modal()
