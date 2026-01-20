@@ -1,0 +1,26 @@
+{% extends "_base.html" %}
+{% block css %}
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
+{% endblock %}
+{% block title %}HOME{% endblock %}
+
+{% block content %}
+    <!-- Create the editor container -->
+    <div id="editor">
+    <p>Hello World!</p>
+    <p>Some initial <strong>bold</strong> text</p>
+    <p><br /></p>
+    </div>
+
+
+{% endblock %}
+
+{% block script %}
+    <!-- Include the Quill library -->
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+
+    <!-- Initialize Quill editor -->
+    <script src="{{url_for('static',filename='js/blog/create.js')}}"></script>
+
+
+{% endblock %}
